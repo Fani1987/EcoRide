@@ -1,0 +1,107 @@
+<br />
+<h1 class="bg-secondary text-center text-black">En Route !</h1>
+
+<br />
+
+<div class="bg-primary text-black text-center">
+  <div>
+    <form action="" method="get">
+      <div>
+        <label class="marginTextForm" for="name">Ville de départ :</label><br />
+        <input class="form" id="name" type="text" />
+      </div>
+
+      <br />
+
+      <div>
+        <label class="marginTextForm" for="name">Ville d'arrivée :</label><br />
+        <input class="form" type="text" />
+      </div>
+
+      <br />
+
+      <div>
+        <label class="marginDate" for="date">Date :</label><br />
+        <input class="form" id="date" type="date" />
+      </div>
+
+      <br />
+
+      <input class="btn bg-dark" type="submit" value="Rechercher" />
+    </form>
+  </div>
+
+  <br />
+
+  <div>
+    <h4>Si vous le souhaitez, vous pouvez affiner la recherche :</h4>
+  </div>
+  <div class="container mt-4">
+    <!-- Bouton Hamburger (visible seulement sur petit écran) -->
+    <button
+      class="btn btn-outline-secondary filter-toggle bg-dark align-self-lg-center"
+      type="button"
+      data-bs-toggle="collapse"
+      data-bs-target="#filtreCollapse"
+    >
+      ☰ Filtres
+    </button>
+
+    <!-- Barre de filtres (collapsible sur petit écran) -->
+    <div class="collapse d-md-block" id="filtreCollapse">
+      <div class="filter-bar p-3 bg-secondary rounded shadow-sm mb-4">
+        <form class="row gy-3 gx-4 align-items-center">
+          <!-- Catégorie -->
+          <div class="col-12 col-md-3">
+            <label class="form-label bg- rgba(217, 217, 217, 0.5)"
+              >type de trajet</label
+            >
+            <select class="form-select">
+              <option>Toutes</option>
+              <option>Ecologique</option>
+              <option>Standard</option>
+            </select>
+          </div>
+
+          <div class="col-12 col-md-3">
+            <label for="prixMax" class="form-label">Prix maximum</label>
+            <input
+              type="number"
+              class="form-control"
+              id="prixMax"
+              name="prixMax"
+              placeholder="Ex : 50 €"
+              min="0"
+            />
+          </div>
+
+          <div class="col-12 col-md-3">
+            <label for="DureeMax" class="form-label"
+              >Durée maximum du trajet</label
+            >
+            <input
+              type="number"
+              class="form-control"
+              id="dureeMax"
+              name="dureeMax"
+              placeholder="Ex : 30 minutes"
+              min="0"
+            />
+          </div>
+
+          <div class="col-12 col-md-3">
+            <label for="noteMin" class="form-label">Note minimale</label>
+            <input
+              type="number"
+              class="form-control"
+              id="noteMin"
+              name="noteMin"
+              max="10"
+              min="0"
+            />
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
