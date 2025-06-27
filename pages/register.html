@@ -1,0 +1,178 @@
+<div class="container">
+  <h1 class="bg-secondary text-center text-black m-6">Nouveau compte</h1>
+</div>
+
+<div class="bg-primary text-black register">
+  <form action="/pages/php/register.php" method="POST">
+    <div>
+      <label for="pseudo">Pseudo:</label>
+      <input class="form" id="pseudo" name="pseudo" type="text" />
+    </div>
+
+    <br />
+
+    <div>
+      <label for="mail">E-mail :</label>
+      <input class="form" id="email" name="email" type="email" />
+    </div>
+
+    <br />
+
+    <div>
+      <p class="text-center">
+        Pour protéger vos comptes, créez des mots de passe sécurisés. Utilisez
+        au moins 12 caractères, mélangez lettres, chiffres et symboles, et
+        évitez les informations personnelles.
+      </p>
+    </div>
+
+    <div>
+      <label for="pass">Mot de passe :</label>
+      <input
+        class="form"
+        id="pass"
+        name="password"
+        type="password"
+        pattern="^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z\d]).{12,}$"
+        title="Le mot de passe doit contenir au moins 12 caractères, avec une lettre, un chiffre et un symbole."
+      />
+    </div>
+
+    <div>
+      <label for="pass">Confirmer mot de passe :</label>
+      <input class="form" id="confirm_pass" type="password" />
+    </div>
+
+    <div>
+      <label for="">Type d'utilisateur :</label>
+      <input
+        class="form"
+        type="text"
+        list="usertype"
+        id="type"
+        name="type"
+        onchange="toggleVehicleFields()"
+      />
+      <datalist id="usertype">
+        <option value="Chauffeur"></option>
+        <option value="Passager"></option>
+        <option value="Passager/Chauffeur"></option>
+      </datalist>
+    </div>
+
+    <br />
+
+    <div id="vehicleFields" style="display: none">
+      <div class="text-center">
+        <p>
+          Vous souhaitez devenir Eco chauffeur! Merci de nous fournir quelques
+          informations supplémentaires :
+        </p>
+      </div>
+
+      <div>
+        <label for="car">Marque du véhicule :</label>
+        <input class="form" id="car" name="car" type="text" />
+      </div>
+
+      <br />
+
+      <div>
+        <label for="model">Modèle du véhicule :</label>
+        <input class="form" id="model" name="model" type="text" />
+      </div>
+
+      <br />
+
+      <div>
+        <label for="color">Couleur du véhicule :</label>
+        <input class="form" id="color" name="color" type="text" />
+      </div>
+
+      <br />
+
+      <div>
+        <label for="plate">Numéro d'immatriculation :</label>
+        <input class="form" id="plate" name="plate" type="text" />
+      </div>
+
+      <br />
+
+      <div>
+        <label for="immatriculationDate"
+          >Date de première immatriculation :</label
+        >
+        <input
+          class="form"
+          id="immatriculation"
+          name="immatriculation"
+          type="date"
+        />
+      </div>
+
+      <br />
+
+      <div>
+        <label for="places">Nombre de places disponibles :</label>
+        <input class="form" id="places" name="places" type="number" />
+      </div>
+
+      <br />
+
+      <div>
+        <label for="prefs">Préférences d'utilisation :</label>
+      </div>
+
+      <div>
+        <label
+          ><input type="checkbox" name="prefs[]" value="smoke" />Fumeurs
+          acceptés</label
+        >
+      </div>
+
+      <div>
+        <label
+          ><input type="checkbox" name="prefs[]" value="animals" />Animaux
+          acceptés</label
+        >
+      </div>
+
+      <div>
+        <label
+          ><input type="checkbox" name="prefs[]" value="men" />Hommes seuls
+          refusés</label
+        >
+      </div>
+
+      <div>
+        <label
+          ><input type="checkbox" name="prefs[]" value="music" /> Musique</label
+        >
+      </div>
+
+      <br />
+    </div>
+
+    <div class="text-center">
+      <button
+        class="btn btn-dark"
+        type="submit"
+        onclick="enregistrerPreferences()"
+      >
+        Enregistrer
+      </button>
+    </div>
+  </form>
+</div>
+
+<script>
+  function toggleVehicleFields() {
+    const type = document.getElementById("type").value;
+    const vehicleFields = document.getElementById("vehicleFields");
+    if (type === "Chauffeur" || type === "Passager/Chauffeur") {
+      vehicleFields.style.display = "block";
+    } else {
+      vehicleFields.style.display = "none";
+    }
+  }
+</script>

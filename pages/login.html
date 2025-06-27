@@ -5,13 +5,14 @@
 </div>
 
 <div class="bg-primary text-black login">
+  <form method="post" action=""></form>
   <section>
     <div>
       <label for="mail">E-mail :</label>
     </div>
     <br />
     <div>
-      <input class="form" id="mail" type="email" />
+      <input class="form" id="mail" name="email" type="email" required />
     </div>
   </section>
 
@@ -23,7 +24,7 @@
     </div>
     <br />
     <div>
-      <input class="form" id="pass" type="password" />
+      <input class="form" id="pass" name="password" type="password" required />
     </div>
   </section>
 
@@ -42,4 +43,7 @@
       <a href="/register">Nouveau venu? Créez votre compte en 2 min</a>
     </div>
   </section>
+</form>
 </div>
+
+
