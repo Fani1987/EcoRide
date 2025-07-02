@@ -47,8 +47,6 @@ h6 {
   font-family: $font-family-sans-serif;
 }
 h1 {
-  margin-left: 15%;
-  margin-right: 15%;
   text-align: center;
   color: $black;
   background-color: $secondary;
@@ -115,6 +113,11 @@ form .form {
   text-align: justify;
 }
 
+/* Style simple pour la barre de filtres */
+.filtres {
+  margin-bottom: 20px;
+}
+
 .login {
   position: absolute;
   top: 50%;
@@ -125,6 +128,18 @@ form .form {
 .register {
   width: 350px;
   margin: 50px auto;
+}
+
+#successMessage {
+  display: none;
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background-color: $secondary;
+  color: $black;
+  padding: 15px;
+  border-radius: 5px;
+  z-index: 1000;
 }
 
 .filter-toggle {

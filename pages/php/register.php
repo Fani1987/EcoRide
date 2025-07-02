@@ -6,7 +6,6 @@ $db   = 'ecoride';
 $user = 'EstefaniaCapitao';
 $pass = 'Mael06012014!';
 $charset = 'utf8mb4';
-
 $dsn = "mysql:host=$host;dbname=$db;charset=$charset";
 $options = [
     PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
@@ -23,22 +22,18 @@ try {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $pseudo = $_POST['pseudo'];
     $email = $_POST['email'];
-    $mdp = $_POST['password'];
+    $mdp = $_POST['mot_de_passe'];
     $type = $_POST['type'];
     $prefs = isset($_POST['prefs']) ? $_POST['prefs'] : [];
-
     $isChauffeur = $type === 'Chauffeur' || $type === 'Passager/Chauffeur';
     $isPassager = $type === 'Passager' || $type === 'Passager/Chauffeur';
-
     $hash = password_hash($mdp, PASSWORD_DEFAULT);
 
     // Vérification des champs requis
-
     if (empty($pseudo) || empty($email) || empty($mdp) || empty($type)) {
         echo "<p class='text-danger'>Tous les champs sont requis.</p>";
         return;
     }
-
 
     // Vérification de la complexité du mot de passe
     if (!preg_match("/^(?=.*[A-Za-z])(?=.*\\d)(?=.*[^A-Za-z\\d]).{12,}$/", $mdp)) {
@@ -56,8 +51,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // Insertion dans la table utilisateurs
-    $stmt = $pdo->prepare("INSERT INTO utilisateurs (pseudo, email, mot_de_passe, role) VALUES (?, ?, ?, 'utilisateur')");
-    $stmt->execute([$pseudo, $email, $hash]);
+    $stmt = $pdo->prepare("INSERT INTO utilisateurs (pseudo, email, mot_de_passe, role, descrition) VALUES (?, ?, ?, 'utilisateur', ?)");
+    $stmt->execute([$pseudo, $email, $hash, $descrition]);
     $user_id = $pdo->lastInsertId();
 
     // Insertion dans la table profils_utilisateur
@@ -71,20 +66,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $couleur = $_POST['color'];
         $plaque = $_POST['plate'];
         $immat = $_POST['immatriculation'];
-        $places = $_POST['places'];
 
-        if ($marque && $modele && $couleur && $plaque && $immat  && $places) {
-            $stmt = $pdo->prepare("INSERT INTO vehicules (utilisateur_id, marque, modele, couleur, plaque_immatriculation, date_premiere_immat, places) VALUES (?, ?, ?, ?, ?, ?, ?)");
-            $stmt->execute([$user_id, $marque, $modele, $couleur, $plaque, $immat, $places]);
+
+        if ($marque && $modele && $couleur && $plaque && $immat) {
+            $stmt = $pdo->prepare("INSERT INTO vehicules (utilisateur_id, marque, modele, couleur, plaque_immatriculation, date_premiere_immat) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$user_id, $marque, $modele, $couleur, $plaque, $immat]);
         }
     }
 
     // Enregistrer les préférences si c’est un chauffeur
-    if ($isChauffeur && !empty($prefs)) {
-        $prefsString = implode(',', $prefs);
-        $stmt = $pdo->prepare("INSERT INTO preferences_utilisateur  (utilisateur_id, preferences) VALUES (?, ?)");
-        $stmt->execute([$user_id, $prefsString]);
-    }
 
+    foreach ($prefs as $pref) {
+        $stmt = $pdo->prepare("INSERT INTO preferences_utilisateur (utilisateur_id, preference) VALUES (?, ?)");
+        $stmt->execute([$user_id, $pref]);
+    }
     echo "<p class='text-success'>Inscription réussie !</p>";
 }

@@ -10,27 +10,21 @@
     vos besoins.
   </p>
   <div>
-    <form action="" method="get">
+    <form action="/covoiturage" method="get">
       <div class="mb-3">
-        <label class="TextForm" for="name">Ville de départ :</label>
-        <input class="form" id="name" type="text" />
+        <label class="TextForm" for="depart">Ville de départ :</label>
+        <input class="form" id="depart" name="depart" type="text" required />
       </div>
 
-      <br />
-
-      <div>
-        <label class="TextForm" for="name">Ville d'arrivée :</label>
-        <input class="form" type="text" />
+      <div class="mb-3">
+        <label class="TextForm" for="arrivee">Ville d'arrivée :</label>
+        <input class="form" id="arrivee" name="arrivee" type="text" required />
       </div>
 
-      <br />
-
-      <div>
+      <div class="mb-3">
         <label class="Date" for="date">Date :</label>
-        <input class="form" id="date" type="date" />
+        <input class="form" id="date" name="date" type="date" required />
       </div>
-
-      <br />
 
       <input class="btn btn-dark" type="submit" value="Rechercher" />
     </form>
