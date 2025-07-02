@@ -8,5 +8,5 @@
   RewriteRule ^ - [L]
 
   # Sinon, on redirige vers index.html
-  RewriteRule ^ index.html [L]
+  RewriteRule ^(.*)$ index.php [QSA,L]
 </IfModule>

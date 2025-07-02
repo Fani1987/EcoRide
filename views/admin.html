@@ -1,8 +1,8 @@
-<main class="container mt-5">
-
-<h2 class="card border-danger bg-primary text-center text-black mb-4">
-    ADMINISTRATION
-  </h2>
+<main>
+  <div class="container mt-5">
+    <h2 class="card border-danger bg-primary text-center text-black mb-4">
+      ADMINISTRATION
+    </h2>
 
     <h1 class="mb-4">Gestion des comptes</h1>
 
@@ -20,7 +20,12 @@
         </div>
         <div class="col-md-4">
           <label for="mdpEmploye" class="text-black">Mot de passe</label>
-          <input type="password" class="form-control" id="mdpEmploye" required />
+          <input
+            type="password"
+            class="form-control"
+            id="mdpEmploye"
+            required
+          />
         </div>
         <div class="col-12">
           <button type="submit" class="btn btn-dark">Créer le compte</button>
@@ -47,9 +52,9 @@
           <button type="submit" class="btn btn-danger">Suspendre</button>
         </div>
       </form>
-     </section>
+    </section>
 
-     <!-- Section graphiques -->
+    <!-- Section graphiques -->
     <h1 class="mb-4">Statistiques</h1>
     <section class="text-center">
       <div class="row">
@@ -63,45 +68,49 @@
         </div>
       </div>
       <div class="alert bg-dark text-white">
-        <strong>Total de crédits gagnés :</strong> <span id="totalCredits">0</span>
+        <strong>Total de crédits gagnés :</strong>
+        <span id="totalCredits">0</span>
       </div>
     </section>
-  </main>
+  </div>
+</main>
 
-  <!-- Chart.js -->
-  https://cdn.jsdelivr.net/npm/chart.js
-  <script>
-    // Exemple de données fictives
-    const ctx1 = document.getElementById('graphCovoiturages');
-    const ctx2 = document.getElementById('graphCredits');
+<!-- Chart.js -->
+https://cdn.jsdelivr.net/npm/chart.js
+<script>
+  // Exemple de données fictives
+  const ctx1 = document.getElementById("graphCovoiturages");
+  const ctx2 = document.getElementById("graphCredits");
 
-    new Chart(ctx1, {
-      type: 'line',
-      data: {
-        labels: ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven'],
-        datasets: [{
-          label: 'Covoiturages',
+  new Chart(ctx1, {
+    type: "line",
+    data: {
+      labels: ["Lun", "Mar", "Mer", "Jeu", "Ven"],
+      datasets: [
+        {
+          label: "Covoiturages",
           data: [5, 8, 6, 10, 7],
-          borderColor: 'green',
-          tension: 0.3
-        }]
-      }
-    });
+          borderColor: "green",
+          tension: 0.3,
+        },
+      ],
+    },
+  });
 
-    new Chart(ctx2, {
-      type: 'bar',
-      data: {
-        labels: ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven'],
-        datasets: [{
-          label: 'Crédits gagnés',
+  new Chart(ctx2, {
+    type: "bar",
+    data: {
+      labels: ["Lun", "Mar", "Mer", "Jeu", "Ven"],
+      datasets: [
+        {
+          label: "Crédits gagnés",
           data: [10, 16, 12, 20, 14],
-          backgroundColor: 'rgba(0, 123, 255, 0.5)'
-        }]
-      }
-    });
+          backgroundColor: "rgba(0, 123, 255, 0.5)",
+        },
+      ],
+    },
+  });
 
-    // Total fictif
-    document.getElementById('totalCredits').textContent = 72;
-  </script>
-</body>
-
+  // Total fictif
+  document.getElementById("totalCredits").textContent = 72;
+</script>
