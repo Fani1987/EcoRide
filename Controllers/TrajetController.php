@@ -8,8 +8,7 @@ class TrajetController
     {
         if (!isset($_SESSION['user_id'])) {
             // Utiliser le système de message flash
-            $_SESSION['message'] = ['type' => 'danger', 'text' => 'Utilisateur non connecté.'];
-            header("Location: /login"); // Redirection vers la route de connexion
+            echo json_encode(['success' => 'Trajet ajouté avec succès !']); // Redirection vers la route de connexion
             exit;
         }
 
@@ -23,8 +22,8 @@ class TrajetController
 
         // Validation des champs
         if (empty($depart) || empty($arrivee) || empty($date_depart) || empty($prix) || empty($vehicule_id) || empty($places)) {
-            $_SESSION['message'] = ['type' => 'danger', 'text' => 'Veuillez remplir tous les champs du trajet.'];
-            header("Location: /profile"); // Rediriger vers la page de profil où se trouve le formulaire
+            http_response_code(400); // Bad Request
+            echo json_encode(['error' => 'Veuillez remplir tous les champs du trajet.']); // Rediriger vers la page de profil où se trouve le formulaire
             exit;
         }
 
@@ -35,8 +34,8 @@ class TrajetController
             $vehicule = $stmt->fetch();
 
             if (!$vehicule) {
-                $_SESSION['message'] = ['type' => 'danger', 'text' => 'Véhicule non trouvé ou ne vous appartient pas.'];
-                header("Location: /profile");
+                http_response_code(400); // Bad Request
+                echo json_encode(['error' => 'Véhicule non trouvé ou ne vous appartient pas.']);
                 exit;
             }
 
@@ -48,12 +47,12 @@ class TrajetController
                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
             $stmt->execute([$chauffeur_id, $vehicule_id, $depart, $arrivee, $date_depart, $prix, $places, $est_ecologique]);
 
-            $_SESSION['message'] = ['type' => 'success', 'text' => 'Trajet ajouté avec succès !'];
-            header("Location: /profile"); // Rediriger vers la page de profil
+            echo json_encode(['success' => 'Trajet ajouté avec succès !']);
             exit;
         } catch (PDOException $e) {
-            $_SESSION['message'] = ['type' => 'danger', 'text' => 'Erreur lors de l\'ajout du trajet : ' . $e->getMessage()];
-            header("Location: /profile");
+            http_response_code(400); // Bad Request
+            echo json_encode(['error' => 'Erreur lors de l\'ajout du trajet : ' . $e->getMessage()]);
+
             exit;
         }
     }

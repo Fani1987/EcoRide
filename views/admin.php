@@ -1,0 +1,110 @@
+<div class="container mt-5">
+  <h2 class="card border-danger bg-primary text-center text-black mb-4">
+    ADMINISTRATION
+  </h2>
+
+  <h1 class="mb-4">Gestion des comptes</h1>
+
+  <!-- Section création d'employé -->
+  <section class="mb-5">
+    <h2 class="text-dark">Créer un compte employé</h2>
+    <form class="row g-3">
+      <div class="col-md-4">
+        <label for="nomEmploye" class="text-black">Nom</label>
+        <input type="text" class="form-control" id="nomEmploye" required />
+      </div>
+      <div class="col-md-4">
+        <label for="emailEmploye" class="text-black">Email</label>
+        <input type="email" class="form-control" id="emailEmploye" required />
+      </div>
+      <div class="col-md-4">
+        <label for="mdpEmploye" class="text-black">Mot de passe</label>
+        <input
+          type="password"
+          class="form-control"
+          id="mdpEmploye"
+          required />
+      </div>
+      <div class="col-12">
+        <button type="submit" class="btn btn-dark">Créer le compte</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- Section suspension de comptes -->
+  <section class="mb-5">
+    <h2 class="text-dark">Suspendre un compte</h2>
+    <form class="row g-3">
+      <div class="col-md-6">
+        <label for="emailCompte" class="text-black">Email du compte</label>
+        <input type="email" class="form-control" id="emailCompte" required />
+      </div>
+      <div class="col-md-6">
+        <label for="typeCompte" class="text-black">Type de compte</label>
+        <select class="form-select text-black" id="typeCompte">
+          <option value="utilisateur">Utilisateur</option>
+          <option value="employe">Employé</option>
+        </select>
+      </div>
+      <div class="col-12">
+        <button type="submit" class="btn btn-danger">Suspendre</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- Section graphiques -->
+  <h1 class="mb-4">Statistiques</h1>
+  <section class="text-center">
+    <div class="row">
+      <div class="col-md-6 mb-4">
+        <h5>Covoiturages par jour</h5>
+        <canvas id="graphCovoiturages"></canvas>
+      </div>
+      <div class="col-md-6 mb-4">
+        <h5>Crédits gagnés par jour</h5>
+        <canvas id="graphCredits"></canvas>
+      </div>
+    </div>
+    <div class="alert bg-dark text-white">
+      <strong>Total de crédits gagnés :</strong>
+      <span id="totalCredits">0</span>
+    </div>
+  </section>
+</div>
+
+
+<!-- Chart.js -->
+https://cdn.jsdelivr.net/npm/chart.js
+<script>
+  // Exemple de données fictives
+  const ctx1 = document.getElementById("graphCovoiturages");
+  const ctx2 = document.getElementById("graphCredits");
+
+  new Chart(ctx1, {
+    type: "line",
+    data: {
+      labels: ["Lun", "Mar", "Mer", "Jeu", "Ven"],
+      datasets: [{
+        label: "Covoiturages",
+        data: [5, 8, 6, 10, 7],
+        borderColor: "green",
+        tension: 0.3,
+      }, ],
+    },
+  });
+
+  new Chart(ctx2, {
+    type: "bar",
+    data: {
+      labels: ["Lun", "Mar", "Mer", "Jeu", "Ven"],
+      datasets: [{
+        label: "Crédits gagnés",
+        data: [10, 16, 12, 20, 14],
+        backgroundColor: "rgba(0, 123, 255, 0.5)",
+      }, ],
+    },
+  });
+
+  // Total fictif
+  document.getElementById("totalCredits").textContent = 72;
+</script>

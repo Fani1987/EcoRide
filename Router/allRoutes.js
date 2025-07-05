@@ -1,16 +1,25 @@
+// public/Router/allRoutes.js
 import Route from "./Route.js";
 
-//Définir ici vos routes
 export const allRoutes = [
-  new Route("/", "Accueil", "/Pages/home.html"),
-  new Route("/login", "Connexion/Deconnexion", "/Pages/login.html"),
-  new Route("/register", "Inscription", "/Pages/register.html"),
-  new Route("/profile", "Profil", "/Pages/profile.html"),
-  new Route("/legalNotice", "Mentions légales", "/Pages/legalNotice.html"),
-  new Route("/covoiturage", "Covoiturages", "/Pages/covoiturage.html"),
-  new Route("/employees", "Employés", "/Pages/employees.html"),
-  new Route("/admin", "Administration", "/Pages/admin.html"),
+  new Route("/", "Accueil", "/get-view/home"), // Endpoint pour la vue home.php
+  new Route("/login", "Connexion/Deconnexion", "/get-view/login"), // Endpoint pour la vue login.php
+  new Route("/register", "Inscription", "/get-view/register"), // Endpoint pour la vue register.php
+  new Route("/profile", "Profil", "/get-view/profile"), // Endpoint pour la vue profile.php
+  new Route("/legalNotice", "Mentions légales", "/get-view/legalNotice"), // Endpoint pour la vue legalNotice.php
+  new Route("/covoiturage", "Covoiturages", "/get-view/covoiturage"), // Endpoint pour la vue covoiturage.php
+
+  // Pour le détail du covoiturage, si le contenu est aussi généré dynamiquement par PHP
+  // et que le JS spécifique dépend du contenu HTML chargé.
+  new Route(
+    "/covoiturage-detail",
+    "Détail covoiturage",
+    "/get-view/covoiturage-detail", // Endpoint pour la vue covoiturage-detail.php
+    "/Router/CovoiturageDetail.js" // Le chemin du JS reste le même (dans public/Router)
+  ),
+
+  new Route("/employees", "Employés", "/get-view/employees"), // Endpoint pour la vue employees.php
+  new Route("/admin", "Administration", "/get-view/admin"), // Endpoint pour la vue admin.php
 ];
 
-//Le titre s'affiche comme ceci : Route.titre - websitename
 export const websiteName = "EcoRide";

@@ -4,103 +4,104 @@ ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 session_start(); // Toujours démarrer la session au début
 
-// 1. Inclusion de la connexion à la base de données
-require_once 'db_connection.php'; // Connexion à la base de données
+// 1. Inclusion de l'autoloader de Composer (pour phpdotenv et futures classes)
+require_once __DIR__ . '/vendor/autoload.php';
 
-// 2. Inclusion des contrôleurs
-require_once 'controllers/AuthController.php'; // Gère login, register, logout
-require_once 'controllers/CovoiturageController.php'; // Gère les covoiturages
-require_once 'controllers/TrajetController.php'; // Gère l'ajout/réservation de trajets
-require_once 'controllers/UserController.php'; // Gère le profil utilisateur
+// Charger les variables d'environnement
+$dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
+$dotenv->load();
 
+// 2. Connexion à la base de données (maintenant sécurisée via .env)
+require_once 'db_connection.php';
 
-// 3. Fonction pour inclure les vues avec header et footer
-// Déplacez la fonction renderView HORS de la condition if (!function_exists('renderView'))
-// Laisser la condition est utile si votre fichier index.php est lui-même inclus ailleurs,
-// mais pour un point d'entrée unique, c'est inutile et peut causer des problèmes d'analyse.
+// 3. Inclure les contrôleurs uniquement si leurs méthodes sont appelées
+// Pour l'instant, nous allons les garder car ils sont appelés dans les routes API ci-dessous.
+require_once 'controllers/AuthController.php';
+require_once 'controllers/CovoiturageController.php';
+require_once 'controllers/TrajetController.php';
+require_once 'controllers/UserController.php';
+
+// Le script PHP principal gère le squelette de l'application et les points d'API.
+// Le routage des pages se fera côté client avec router.js.
+
+// Fonction pour inclure les vues
 function renderView($viewName, $data = [])
 {
-    global $pdo; // Assurez-vous que $pdo est disponible si nécessaire dans les templates
-
     extract($data); // Rend les variables du tableau $data disponibles dans la vue
-
-    // Inclusion du header
-    require_once 'header_template.php';
-
-    // Bufferisation du contenu de la vue
-    ob_start();
-    require_once 'views/' . $viewName . '.php'; // Assurez-vous que vos vues sont dans le dossier 'views/'
-    $pageContent = ob_get_clean();
-    echo $pageContent; // Affiche le contenu
-
-    // Inclusion du footer
-    require_once 'footer_template.php';
+    require_once __DIR__ . '/views/' . $viewName . '.php';
 }
 
-// 4. Récupération de l'URL demandée
-$requestUri = $_SERVER['REQUEST_URI'];
-$requestPath = parse_url($requestUri, PHP_URL_PATH);
+// Inclure le header
+require_once 'header_template.php';
 
-// 5. Système de routage
-switch ($requestPath) {
+// Le conteneur principal où le contenu des pages sera injecté par JavaScript
+echo '<div id="main-page">';
+// Initialisation du contenu de la page d'accueil par défaut si nécessaire
+// ou laisser le router.js charger la bonne page au chargement initial.
+// Pour les routes HTML/JS, le contenu sera chargé par le front-end.
+echo '</div>'; // Fin de main-page
+
+// Gérer les routes API et les actions spécifiques côté serveur
+$requestUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+
+switch ($requestUri) {
     case '/':
-        renderView('home'); // Affiche home.html
+    case '/home':
+        renderView('home');
         break;
-
     case '/covoiturage':
-        // Le CovoiturageController gère la récupération des filtres depuis $_GET
         CovoiturageController::showCovoituragePage($pdo, $_GET);
         break;
-
+    case '/legalNotice':
+        renderView('legalNotice');
+        break;
+    case '/profile':
+        if (isset($_SESSION['user_id'])) {
+            UserController::showProfilePage($pdo, $_SESSION['user_id']);
+        } else {
+            $_SESSION['message'] = ['type' => 'danger', 'text' => 'Veuillez vous connecter pour accéder à votre profil.'];
+            header("Location: /login");
+            exit;
+        }
+        break;
+    case '/employees':
+        renderView('employees');
+        break;
+    case '/admin':
+        renderView('admin');
+        break;
     case '/login':
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             AuthController::login($pdo, $_POST);
         } else {
-            renderView('login'); // Affiche login.html
+            renderView('login');
         }
         break;
-
     case '/register':
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             AuthController::register($pdo, $_POST);
         } else {
-            renderView('register'); // Affiche register.html
+            renderView('register');
         }
         break;
 
-    case '/logout':
-        AuthController::logout(); // Appel de la méthode du contrôleur
+    case '/api/trajet.php':
+        // Cette route est gérée par trajet.php directement car c'est une API
+        // Vous n'avez pas besoin de la traiter ici si trajet.php est un endpoint direct.
+        // Sinon, si c'est censé être géré par un contrôleur:
+        // TrajetController::getTrajetDetails($pdo, $_GET['id']);
+        // Pour l'instant, on suppose que trajet.php est un fichier séparé accessible directement.
+        // Si ce n'est pas le cas, il faudrait inclure ou appeler la logique ici.
         break;
 
-    case '/profile':
-        if (isset($_SESSION['user_id'])) {
-            UserController::showProfilePage($pdo, $_SESSION['user_id']); // Appelle la méthode du UserController
-        } else {
-            header('Location: /login'); // Redirige si non connecté
-            exit;
-        }
-        break;
-
-    case '/legalNotice':
-        renderView('legalNotice'); // Affiche legalNotice.html
-        break;
-
-    case '/admin':
-        // Logique de vérification de rôle ici si nécessaire
-        renderView('admin');
-        break;
-
-    case '/employees':
-        renderView('employees');
-        break;
-
-    // --- Routes API (requêtes POST/GET par JavaScript) ---
+    // API endpoints pour les actions POST
     case '/api/ajouterTrajet':
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             TrajetController::ajouterTrajet($pdo, $_POST);
         } else {
-            http_response_code(405); // Method Not Allowed
-            echo json_encode(['error' => 'Méthode non autorisée.']);
+            http_response_code(405); // méthode non autorisée
+            // Répondre avec un message JSON
+            echo json_encode(['error' => 'Méthode non autorisée pour ajouter un trajet.']);
         }
         break;
 
@@ -108,18 +109,28 @@ switch ($requestPath) {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             TrajetController::reserverTrajet($pdo, $_POST);
         } else {
-            http_response_code(405);
-            echo json_encode(['error' => 'Méthode non autorisée.']);
+            http_response_code(405); // méthode non autorisée
+            // Répondre avec un message JSON
+            echo json_encode(['error' => 'Méthode non autorisée pour réserver un trajet.']);
         }
         break;
 
-    // Ajout d'une route pour la déconnexion
-    case 'logout':
+    case '/logout': // La déconnexion est une action PHP
         AuthController::logout();
         break;
 
+    // Toutes les autres routes (pages) sont gérées par JavaScript.
+
     default:
-        http_response_code(404);
-        renderView('404');
+        // Pour toutes les requêtes de pages (GET), PHP ne fait rien d'autre que servir le squelette.
+        // Le contenu spécifique de la page sera chargé par router.js.
+        // Si la route n'est pas une API et n'est pas une page gérée par PHP, on peut inclure le 404.
+        if (!file_exists(__DIR__ . '/pages/' . str_replace('/', '', $requestUri) . '.php')) {
+            renderView('404');
+            http_response_code(404);
+        }
         break;
 }
+
+// Inclure le footer
+require_once 'footer_template.php';

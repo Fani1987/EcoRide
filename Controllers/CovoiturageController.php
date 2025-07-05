@@ -113,7 +113,6 @@ class CovoiturageController
         $covoiturages = self::getFilteredCovoiturages($pdo, $queryParams);
 
         // Passer les covoiturages à la vue
-        // Assurez-vous que la fonction renderView est définie et accessible globalement (par exemple, dans index.php)
         if (function_exists('renderView')) {
             renderView('covoiturage', ['covoiturages' => $covoiturages]);
         } else {

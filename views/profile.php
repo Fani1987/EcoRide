@@ -1,5 +1,5 @@
 <main>
-  <div class="container mb-5 ">
+  <div class="bg-primary container mb-5 ">
     <br />
     <div class="row">
       <div class="col-md-4 text-center text-black">
@@ -101,5 +101,4 @@
       </div>
     </div>
   </div>
-
 </main>

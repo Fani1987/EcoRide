@@ -37,16 +37,16 @@ Assurez-vous d'avoir les éléments suivants installés :
 
 ### Étapes d'installation
 
-1.  **Cloner le dépôt :**
+1.**Cloner le dépôt :**
 
     ```bash
-    git clone [https://github.com/votre_utilisateur/EcoRide.git](https://github.com/votre_utilisateur/EcoRide.git)
+    git clone [Dépôt GitHub de mon projet](https://github.com/Fani1987/EcoRide)
     cd EcoRide
     ```
 
     _(Remplacez `https://github.com/votre_utilisateur/EcoRide.git` par l'URL de votre propre dépôt si vous en utilisez un.)_
 
-2.  **Configuration de la base de données :**
+2.**Configuration de la base de données :**
 
     - Créez une nouvelle base de données MySQL nommée `ecoride`.
     - Importez le schéma de la base de données fourni :
@@ -99,13 +99,13 @@ Assurez-vous d'avoir les éléments suivants installés :
       DELIMITER ;
       ```
 
-3.  **Configuration du serveur web (Apache/Nginx) :**
+3.**Configuration du serveur web (Apache/Nginx) :**
 
     - Placez les fichiers du projet dans le répertoire de votre serveur web (ex: `htdocs` pour Apache sous XAMPP).
     - Configurez votre serveur web pour pointer vers le dossier `public` de votre projet (si vous avez un dossier `public` comme point d'entrée pour les requêtes) ou directement à la racine si `index.php` est à la racine.
     - Assurez-vous que les réécritures d'URL (`mod_rewrite` pour Apache) sont activées pour permettre le routage de votre application (ex: `/profile/10` vers `index.php`).
 
-4.  **Configuration de la connexion à la base de données (PHP) :**
+4.**Configuration de la connexion à la base de données (PHP) :**
 
     - Vous aurez probablement un fichier de configuration pour la base de données (ex: `config/database.php` ou similaire). Mettez à jour les identifiants de connexion (hôte, nom de la base de données, utilisateur, mot de passe) pour qu'ils correspondent à votre installation MySQL.
     - Voici un exemple de ce à quoi cela pourrait ressembler (adaptez le chemin et les informations d'identification) :
@@ -133,21 +133,21 @@ Assurez-vous d'avoir les éléments suivants installés :
       }
       ```
 
-5.  **Vérification de la fonction `renderView` :**
-    Assurez-vous que votre fonction `renderView` (souvent définie dans `index.php` ou un fichier d'utilitaires) utilise l'extension `.php` pour inclure les vues, comme nous l'avons corrigé :
-    ```php
+5.**Vérification de la fonction `renderView` :**
+Assurez-vous que votre fonction `renderView` (souvent définie dans `index.php` ou un fichier d'utilitaires) utilise l'extension `.php` pour inclure les vues, comme nous l'avons corrigé :
+`php
     // Dans index.php ou votre fichier d'aide/routeur
     function renderView($viewName, $data = []) {
         extract($data); // Rend les variables du tableau $data disponibles dans la vue
         require_once __DIR__ . '/views/' . $viewName . '.php'; // Assurez-vous que c'est .php
     }
-    ```
-    _Si votre `index.php` contient directement `require_once 'views/profile.php'`, c'est également correct._
+    `
+_Si votre `index.php` contient directement `require_once 'views/profile.php'`, c'est également correct._
 
 ### Lancement de l'application
 
-1.  Démarrez votre serveur Apache/Nginx et votre serveur MySQL.
-2.  Ouvrez votre navigateur web et naviguez vers l'URL de votre projet (ex: `http://localhost/EcoRide` ou `http://ecoride.local` si vous avez configuré un hôte virtuel).
+1.Démarrez votre serveur Apache/Nginx et votre serveur MySQL.
+2.Ouvrez votre navigateur web et naviguez vers l'URL de votre projet (ex: `http://localhost/EcoRide` ou `http://ecoride.local` si vous avez configuré un hôte virtuel).
 
 ## 📄 Licence
 
@@ -159,4 +159,4 @@ Pour toute question ou suggestion, n'hésitez pas à me contacter :
 
 - **Votre Nom/Pseudo :** Estefania Capitao
 - **Votre Email :** <estefania.capitao@gmail.com>
-- **Profil GitHub :** [Lien vers votre profil GitHub si applicable]
+- **Profil GitHub :** <https://github.com/Fani1987/EcoRide>

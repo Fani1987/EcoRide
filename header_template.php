@@ -51,12 +51,18 @@
                         <li class="nav-item">
                             <a class="nav-link" href="/covoiturage">Covoiturages</a>
                         </li>
-                        <li class="nav-item">
-                            <?php if (isset($_SESSION['user_id'])): ?>
+
+
+                        <?php if (isset($_SESSION['user_id'])): ?>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/profile">Profil</a>
+                            </li>
+                            <li class="nav-item">
                                 <a class="nav-link" href="/logout">Déconnexion</a>
-                            <?php else: ?>
-                                <a class="nav-link" href="/login">Connexion</a>
-                            <?php endif; ?>
+                            </li>
+                        <?php else: ?>
+                            <a class="nav-link" href="/login">Connexion</a>
+                        <?php endif; ?>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link" href="mailto:ecoride@ecoride.fr">Contact</a>

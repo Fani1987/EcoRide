@@ -24,8 +24,7 @@
             id="arrivee"
             name="arrivee"
             type="text"
-            required
-          />
+            required />
         </div>
 
         <div class="mb-3">
@@ -63,8 +62,7 @@
             <img
               class="imgIllustration"
               src="/assets/Images/Environment.jpg"
-              alt="Notre mission"
-            />
+              alt="Notre mission" />
           </div>
         </div>
       </div>
@@ -96,8 +94,7 @@
         <img
           class="imgIllustration"
           src="/assets/Images/EcoRide logo.jpeg"
-          alt="Rejoignez-nous"
-        />
+          alt="Rejoignez-nous" />
       </div>
       <div>
         <p class="text-center p-lg-4">

@@ -1,1 +1,8 @@
+# Ignorer les dépendances Composer
+/vendor/
+
+# Ignorer le fichier d'environnement sensible
+.env
+
+# Ignorer les fichiers de configuration de l'IDE
 node_modules

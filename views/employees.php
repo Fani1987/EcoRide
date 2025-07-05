@@ -1,0 +1,114 @@
+<div class="container mt-5">
+  <h2 class="card border-dark bg-primary text-center text-black mb-4">
+    ESPACE EMPLOYES
+  </h2>
+
+  <h1 class="mb-4">Gestion des avis</h1>
+  <!-- Section validation des avis -->
+  <section class="mb-5">
+    <h2 class="text-dark">Avis à valider</h2>
+    <div class="table-responsive">
+      <table class="table table-bordered table-hover responsive-table">
+        <thead class="table-primary">
+          <tr>
+            <th>Nom</th>
+            <th>Note</th>
+            <th>Avis</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          <tr>
+            <td data-label="Nom">JeanDupont</td>
+            <td data-label="Note">4/5</td>
+            <td data-label="Avis" class="text-end">
+              Très bon trajet, conducteur ponctuel.
+            </td>
+            <td data-label="Action">
+              <button class="btn btn-dark btn-sm">Valider</button>
+              <button class="btn btn-danger btn-sm">Refuser</button>
+            </td>
+          </tr>
+          <!-- Autres avis ici -->
+          <tr>
+            <td data-label="Nom">MarieCurie</td>
+            <td data-label="Note">5/5</td>
+            <td data-label="Avis" class="text-end">
+              Excellent trajet, très agréable.
+            </td>
+            <td data-label="Action">
+              <button class="btn btn-dark btn-sm">Valider</button>
+              <button class="btn btn-danger btn-sm">Refuser</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+  <!-- Section avis validés -->
+  <section>
+    <h2 class="text-dark">Avis validés</h2>
+    <div class="table-responsive">
+      <table class="table table-bordered table-hover responsive-table">
+        <thead class="table-primary">
+          <tr>
+            <th>Nom</th>
+            <th>Note</th>
+            <th>Avis</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td data-label="Nom">JeanDupont</td>
+            <td data-label="Note">4/5</td>
+            <td data-label="Avis" class="text-end">
+              Très bon trajet, conducteur ponctuel.
+            </td>
+          </tr>
+          <!-- Autres avis validés ici -->
+          <tr>
+            <td data-label="Nom">MarieCurie</td>
+            <td data-label="Note">5/5</td>
+            <td data-label="Avis" class="text-end">
+              Excellent trajet, très agréable.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <h1 class="mb-4">Gestion des incidents</h1>
+  <!-- Section covoiturages problématiques -->
+  <section>
+    <h2 class="text-dark">Covoiturages signalés</h2>
+    <div class="table-responsive">
+      <table class="table table-bordered table-hover responsive-table">
+        <thead class="table-primary">
+          <tr>
+            <th>#ID</th>
+            <th>Conducteur</th>
+            <th>Passager</th>
+            <th>Date</th>
+            <th>Lieu</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td data-label="#ID">CVG123</td>
+            <td data-label="Conducteur">jean.dupont@mail.com</td>
+            <td data-label="Passager">marie.curie@mail.com</td>
+            <td data-label="Date">27/06/2025</td>
+            <td data-label="Lieu">Paris → Lyon</td>
+            <td data-label="Description" class="text-end">
+              Retard de 2h et comportement irrespectueux.
+            </td>
+          </tr>
+          <!-- Autres incidents ici -->
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
