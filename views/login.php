@@ -1,3 +1,4 @@
+<main>
 <div class="container">
   <h1 class="bg-secondary text-center text-black m-6">Connexion</h1>
 </div>
@@ -48,3 +49,4 @@
     </section>
   </form>
 </div>
+</main>

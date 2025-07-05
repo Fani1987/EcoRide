@@ -1,5 +1,10 @@
 <?php
 
+namespace App\Controllers;
+
+use PDO; // Importe la classe PDO du namespace global
+use PDOException; // Importe la classe PDOException du namespace global
+
 class AuthController
 {
     /**
