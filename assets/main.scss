@@ -1,0 +1,194 @@
+@import url("/node_modules/bootstrap-icons/font/bootstrap-icons.css");
+@import "custom";
+
+html {
+  position: relative;
+  min-height: 100%;
+  background-color: $primary;
+}
+
+header {
+  padding-bottom: 10px;
+  background-color: $primary;
+  border-bottom: 1px solid var(--bg-Dark, #2a5b3f);
+}
+
+main {
+  margin-bottom: 70px;
+  padding: 20px;
+  background-color: $primary;
+}
+
+footer {
+  border-top: 1px solid var(--bg-Dark, #2a5b3f);
+}
+
+footer.footer {
+  padding: 10px;
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+}
+a {
+  color: var(--bg-Dark, #2a5b3f);
+}
+
+p {
+  font-family: $font-family-serif;
+  font-size: 18px;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: $font-family-sans-serif;
+}
+h1 {
+  text-align: center;
+  color: $black;
+  background-color: $secondary;
+}
+
+.imgIllustration {
+  max-width: 100%;
+  height: auto;
+  border-radius: 50px;
+  padding: 20px;
+}
+
+.imgLogo {
+  width: 50px;
+  height: 50px;
+}
+
+form {
+  max-width: 600px;
+  margin: auto;
+}
+.form {
+  width: 100%;
+  padding: 0.5rem;
+  border-radius: 5px;
+  border: 1px solid $dark;
+}
+
+label {
+  font-weight: bold;
+  margin-bottom: 0.3rem;
+  display: inline-block;
+}
+
+form label {
+  display: block;
+  text-align: left;
+  margin-bottom: 0.5rem;
+  font-weight: bold;
+}
+
+form .form {
+  width: 100%;
+  padding: 0.5rem;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+  margin-bottom: 1rem;
+}
+
+.TextForm,
+.Date {
+  margin-top: 1rem;
+}
+
+.marginNotice {
+  margin-bottom: 70px;
+}
+
+.mentionsTitre {
+  border-bottom: 1px solid var(--bg-Dark, #2a5b3f);
+}
+
+.text-justify {
+  text-align: justify;
+}
+
+/* Style simple pour la barre de filtres */
+.filtres {
+  margin-bottom: 20px;
+}
+
+.register {
+  width: 350px;
+  margin: 50px auto;
+}
+
+#successMessage {
+  display: none;
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background-color: $secondary;
+  color: $black;
+  padding: 15px;
+  border-radius: 5px;
+  z-index: 1000;
+}
+
+.filter-toggle {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  form {
+    padding: 0 1rem;
+  }
+
+  .form {
+    font-size: 1rem;
+  }
+
+  input[type="submit"] {
+    width: 100%;
+    margin-top: 1rem;
+  }
+
+  .filter-toggle {
+    display: block;
+    margin-bottom: 1rem;
+  }
+  .paragraph-services {
+    margin-left: 15%;
+    margin-right: 15%;
+    text-justify: auto;
+  }
+  .responsive-table thead {
+    display: none;
+  }
+
+  .responsive-table tr {
+    display: block;
+    margin-bottom: 1rem;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+  }
+
+  .responsive-table td {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem;
+    border: none;
+    border-bottom: 1px solid #dee2e6;
+  }
+
+  .responsive-table td::before {
+    content: attr(data-label);
+    font-weight: bold;
+    color: #198754;
+  }
+
+  .responsive-table td:last-child {
+    border-bottom: none;
+  }
+}

@@ -1,0 +1,53 @@
+<?php
+
+namespace App\Controllers;
+
+use PDO;
+use PDOException;
+
+class AdminController
+{
+    public static function getStats(PDO $pdo): void
+    {
+        header('Content-Type: application/json');
+
+        try {
+            // Requête : nombre de covoiturages par jour
+            $stmt1 = $pdo->prepare("
+                SELECT DATE(date_depart) AS jour, COUNT(*) AS nombre_covoiturages
+                FROM covoiturages
+                GROUP BY DATE(date_depart)
+                ORDER BY jour ASC
+            ");
+            $stmt1->execute();
+            $covoituragesParJour = $stmt1->fetchAll(PDO::FETCH_ASSOC);
+
+            // Requête : crédits gagnés par jour (somme des prix)
+            $stmt2 = $pdo->prepare("
+                SELECT DATE(date_depart) AS jour, SUM(prix) AS credits_gagnes
+                FROM covoiturages
+                GROUP BY DATE(date_depart)
+                ORDER BY jour ASC
+            ");
+            $stmt2->execute();
+            $creditsParJour = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+
+            // Requête : total des crédits gagnés
+            $stmt3 = $pdo->prepare("
+                SELECT SUM(prix) AS total_credits
+                FROM covoiturages
+            ");
+            $stmt3->execute();
+            $totalCredits = $stmt3->fetch(PDO::FETCH_ASSOC);
+
+            echo json_encode([
+                'covoiturages_par_jour' => $covoituragesParJour,
+                'credits_par_jour' => $creditsParJour,
+                'total_credits' => $totalCredits['total_credits'] ?? 0
+            ]);
+        } catch (PDOException $e) {
+            http_response_code(500);
+            echo json_encode(['error' => 'Erreur lors de la récupération des statistiques.']);
+        }
+    }
+}
