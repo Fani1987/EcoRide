@@ -86,6 +86,7 @@ class Database
                 PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION, // Afficher les erreurs PDO en tant qu'exceptions
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,       // Récupérer les résultats sous forme de tableau associatif
                 PDO::ATTR_EMULATE_PREPARES   => false,                  // Désactiver l'émulation des requêtes préparées pour une meilleure sécurité/performance
+                PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false, // Désactiver la vérification du certificat SSL pour éviter les erreurs de connexion SSL
             ];
 
             try {
