@@ -8,6 +8,8 @@ use MongoDB\BSON\ObjectId;
 
 use PDO;
 use PDOException;
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
 
 class UserController
 {
@@ -328,5 +330,60 @@ class UserController
         } catch (PDOException $e) {
             error_log("Erreur lors de la création de la notification : " . $e->getMessage());
         }
+    }
+
+    public static function handleContactForm(array $postData)
+    {
+        // Récupération et validation des données
+        $nom = trim($postData['nom'] ?? '');
+        $emailExpediteur = trim($postData['email'] ?? '');
+        $sujet = trim($postData['sujet'] ?? '');
+        $message = trim($postData['message'] ?? '');
+
+        if (empty($nom) || empty($emailExpediteur) || !filter_var($emailExpediteur, FILTER_VALIDATE_EMAIL) || empty($sujet) || empty($message)) {
+            $_SESSION['message'] = ['type' => 'danger', 'text' => 'Tous les champs sont requis et l\'email doit être valide.'];
+            header('Location: /contact');
+            exit;
+        }
+
+        // Configuration de l'envoi d'email avec PHPMailer
+        $mail = new PHPMailer(true);
+
+        try {
+            // Configuration du serveur SMTP (depuis vos variables d'environnement)
+            $mail->isSMTP();
+            $mail->Host       = $_ENV['MAIL_HOST'];
+            $mail->SMTPAuth   = true;
+            $mail->Username   = $_ENV['MAIL_USERNAME'];
+            $mail->Password   = $_ENV['MAIL_PASSWORD'];
+            $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+            $mail->Port       = $_ENV['MAIL_PORT'];
+            $mail->CharSet    = 'UTF-8';
+
+            // Destinataires
+            $mail->setFrom($_ENV['MAIL_USERNAME'], 'Formulaire de Contact EcoRide'); // L'expéditeur est votre compte d'envoi
+            $mail->addAddress('contact@ecoride.fr', 'Support EcoRide');   // L'email de destination de votre entreprise
+            $mail->addReplyTo($emailExpediteur, $nom); // Pour pouvoir répondre directement à l'utilisateur
+
+            // Contenu
+            $mail->isHTML(true);
+            $mail->Subject = 'Nouveau message de contact : ' . htmlspecialchars($sujet);
+            $mail->Body    = "Vous avez reçu un nouveau message de <b>" . htmlspecialchars($nom) . "</b> (" . htmlspecialchars($emailExpediteur) . ").<br><br><hr><br>" . nl2br(htmlspecialchars($message));
+            $mail->AltBody = "Vous avez reçu un nouveau message de " . htmlspecialchars($nom) . " (" . htmlspecialchars($emailExpediteur) . ").\n\n" . htmlspecialchars($message);
+
+            // Envoi (simulé ou réel selon votre configuration .env)
+            // $mail->send(); // Nous laissons cette ligne commentée pour suivre notre logique de simulation
+
+            // Pour la simulation, on écrit dans les logs
+            error_log("SIMULATION: Email de contact envoyé de " . $emailExpediteur . " avec le sujet : " . $sujet);
+
+            $_SESSION['message'] = ['type' => 'success', 'text' => 'Votre message a bien été envoyé. Nous vous répondrons dès que possible.'];
+        } catch (Exception $e) {
+            error_log("Erreur PHPMailer (contact) : {$mail->ErrorInfo}");
+            $_SESSION['message'] = ['type' => 'danger', 'text' => 'Le message n\'a pas pu être envoyé. Veuillez réessayer.'];
+        }
+
+        header('Location: /contact');
+        exit;
     }
 }

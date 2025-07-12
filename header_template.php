@@ -80,7 +80,7 @@ if (isset($_SESSION['message'])) {
                         <?php endif; ?>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="mailto:ecoride@ecoride.fr">Contact</a>
+                            <a class="nav-link" href="/contact">Contact</a>
                         </li>
                     </ul>
                 </div>

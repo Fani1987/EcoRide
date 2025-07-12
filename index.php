@@ -43,6 +43,14 @@ switch ($path) {
         renderView('home');
         break;
 
+    case '/contact':
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            UserController::handleContactForm($_POST);
+        } else {
+            renderView('contact');
+        }
+        break;
+
     case '/login':
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             AuthController::login($pdo, $_POST);
