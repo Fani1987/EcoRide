@@ -37,7 +37,7 @@
     <!-- Section suspension de comptes -->
     <section class="mb-5">
       <h2 class="text-dark">Suspendre un compte</h2>
-      <form class="row g-3" method="POST" action="/api/suspendAccount">
+      <form class="row g-3" id="formSuspendAccount">
         <div class="col-md-6">
           <label for="emailCompte" class="text-black">Email du compte</label>
           <input type="email" class="form-control" id="emailCompte" required />
@@ -151,7 +151,7 @@
         const nbCovoiturages = data.covoiturages_par_jour.map(item => item.nombre_covoiturages);
         const creditsParJour = data.credits_par_jour.map(item => item.credits_gagnes);
 
-        new Chart(document.getElementById('covoituragesChart'), {
+        new Chart(document.getElementById('graphCovoiturages'), {
           type: 'bar',
           data: {
             labels: jours,
@@ -183,7 +183,7 @@
           }
         });
 
-        new Chart(document.getElementById('creditsChart'), {
+        new Chart(document.getElementById('graphCredits'), {
           type: 'line',
           data: {
             labels: jours,

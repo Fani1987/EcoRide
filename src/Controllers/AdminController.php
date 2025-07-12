@@ -12,7 +12,7 @@ class AdminController
         header('Content-Type: application/json');
 
         try {
-            // Requête : nombre de covoiturages par jour
+            // Requête 1 : Nombre de covoiturages par jour (cette requête était déjà bonne).
             $stmt1 = $pdo->prepare("
                 SELECT DATE(date_depart) AS jour, COUNT(*) AS nombre_covoiturages
                 FROM covoiturages
@@ -22,9 +22,9 @@ class AdminController
             $stmt1->execute();
             $covoituragesParJour = $stmt1->fetchAll(PDO::FETCH_ASSOC);
 
-            // Requête : crédits gagnés par jour (somme des prix)
+            // Requête 2 : Crédits gagnés par jour (2 crédits par trajet).
             $stmt2 = $pdo->prepare("
-                SELECT DATE(date_depart) AS jour, SUM(prix) AS credits_gagnes
+                SELECT DATE(date_depart) AS jour, (COUNT(*) * 2) AS credits_gagnes
                 FROM covoiturages
                 GROUP BY DATE(date_depart)
                 ORDER BY jour ASC
@@ -32,9 +32,9 @@ class AdminController
             $stmt2->execute();
             $creditsParJour = $stmt2->fetchAll(PDO::FETCH_ASSOC);
 
-            // Requête : total des crédits gagnés
+            // Requête 3 : Total des crédits gagnés par la plateforme.
             $stmt3 = $pdo->prepare("
-                SELECT SUM(prix) AS total_credits
+                SELECT (COUNT(*) * 2) AS total_credits
                 FROM covoiturages
             ");
             $stmt3->execute();
