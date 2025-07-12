@@ -2,8 +2,6 @@
 // Démarrer la session PHP au tout début du script
 session_start();
 
-// Inclure l'autoloader de Composer en premier.
-require_once __DIR__ . '/vendor/autoload.php';
 
 use Dotenv\Dotenv;
 
@@ -23,16 +21,22 @@ if (file_exists(__DIR__ . '/.env')) {
  */
 function renderView($viewName, $data = [])
 {
+    // Rend les clés du tableau $data accessibles comme des variables locales
     extract($data);
 
+    // La fonction inclut maintenant l'en-tête, le contenu et le pied de page
+    require_once __DIR__ . '/header_template.php';
 
     $viewPath = __DIR__ . '/views/' . $viewName . '.php';
+
     if (file_exists($viewPath)) {
         include $viewPath;
     } else {
         http_response_code(404);
         include __DIR__ . '/views/404.php';
     }
+
+    require_once __DIR__ . '/footer_template.php';
 }
 // --- FIN DE LA FONCTION D'AIDE ---
 
@@ -420,9 +424,4 @@ switch ($path) {
         http_response_code(404);
         renderView('404');
         break;
-}
-
-// INCLUSION DU PIED DE PAGE (conditionnelle)
-if (!$isApiRequest) {
-    require_once __DIR__ . '/footer_template.php';
 }
