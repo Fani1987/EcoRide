@@ -1,24 +1,24 @@
 <?php
-// Démarrer la session PHP au tout début du script
 session_start();
 
 require_once __DIR__ . '/vendor/autoload.php';
 
 use Dotenv\Dotenv;
+use App\Controllers\AuthController;
+use App\Controllers\CovoiturageController;
+use App\Controllers\TrajetController;
+use App\Controllers\UserController;
+use App\Core\Database;
+use App\Controllers\AdminController;
+use App\Controllers\EmployeeController;
+use App\Controllers\AvisController;
+use App\Controllers\PaymentController;
 
-// On ne charge le fichier .env que s'il existe (pour le développement local)
 if (file_exists(__DIR__ . '/.env')) {
     $dotenv = Dotenv::createImmutable(__DIR__);
     $dotenv->load();
 }
 
-/**
- * Fonction globale pour rendre les fichiers de vue.
- * Les données passées seront disponibles comme des variables dans le fichier de vue.
- *
- * @param string $viewName Le nom du fichier de vue (sans l'extension .php, ex: 'home', 'profile').
- * @param array $data Un tableau associatif de données à rendre disponibles dans la vue.
- */
 function renderView($viewName, $data = [])
 {
     extract($data);
@@ -33,32 +33,8 @@ function renderView($viewName, $data = [])
     require_once __DIR__ . '/footer_template.php';
 }
 
-
-
-// Utiliser les classes des contrôleurs avec leurs namespaces
-use App\Controllers\AuthController;
-use App\Controllers\CovoiturageController;
-use App\Controllers\TrajetController;
-use App\Controllers\UserController;
-use App\Core\Database;
-use App\Controllers\AdminController;
-use App\Controllers\EmployeeController;
-use App\Controllers\AvisController;
-use App\Controllers\PaymentController;
-
-// Obtenir l'instance PDO via la classe Database Singleton
 $pdo = Database::getInstance();
-
-// Récupérer l'URL demandée et la nettoyer
 $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-
-// Déterminer si la requête est une requête API (ne doit pas inclure les templates HTML)
-$isApiRequest = (strpos($path, '/api/') === 0 || $path === '/reserver' || $path === '/confirmer-reservation');
-
-// INCLUSION DE L'ENTÊTE (conditionnelle)
-if (!$isApiRequest) {
-    require_once __DIR__ . '/header_template.php';
-}
 
 // ROUTAGE PRINCIPAL
 switch ($path) {
