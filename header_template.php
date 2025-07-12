@@ -17,14 +17,18 @@
     <title>EcoRide</title>
 </head>
 
+</header>
+
 <?php
-// Afficher les messages flash stockés en session, s'il y en a.
-// Ces messages sont destinés aux vues HTML, pas aux réponses JSON des APIs.
-if (isset($_SESSION['message']) && !$isApiRequest) {
-    echo '<div class="alert alert-' . htmlspecialchars($_SESSION['message']['type']) . '">';
-    echo htmlspecialchars($_SESSION['message']['text']);
-    echo '</div>';
-    unset($_SESSION['message']); // Supprimer le message après l'affichage
+// On met l'affichage des messages flash ici pour qu'il soit sur toutes les pages
+if (isset($_SESSION['message'])) {
+    $messageType = $_SESSION['message']['type'];
+    $messageText = $_SESSION['message']['text'];
+    echo '<div class="container mt-3"><div class="alert alert-' . htmlspecialchars($messageType) . ' alert-dismissible fade show" role="alert">';
+    echo htmlspecialchars($messageText);
+    echo '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>';
+    echo '</div></div>';
+    unset($_SESSION['message']);
 }
 ?>
 
