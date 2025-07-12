@@ -3,12 +3,12 @@
         <div class="row justify-content-center">
             <div class="col-md-8 col-lg-7">
                 <h1 class="text-center mb-4">Contactez-nous</h1>
-                <p class="text-center text-muted mb-4">
+                <p class="text-center text-black mb-4">
                     Une question, une suggestion ou un problème ? N'hésitez pas à nous envoyer un message.
                 </p>
 
                 <div class="card shadow-sm border-dark">
-                    <div class="card-body bg-primary  p-4">
+                    <div class="card-body bg-primary text-black  p-4">
                         <form action="/contact" method="POST">
                             <div class="mb-3">
                                 <label for="nom" class="form-label">Votre nom</label>
