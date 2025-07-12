@@ -22,7 +22,7 @@ class CovoiturageController
         FROM covoiturages c
         JOIN utilisateurs u ON c.chauffeur_id = u.id
         JOIN vehicules v ON c.vehicule_id = v.id
-        WHERE 1=1";
+        WHERE c.statut = 'planifié' AND c.places_disponibles > 0";
 
         $params = [];
 

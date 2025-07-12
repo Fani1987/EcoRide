@@ -80,93 +80,100 @@
           </form>
         </div>
       </div>
+
       <div id="covoiturages-results">
         <?php if (!empty($covoiturages)): ?>
           <?php foreach ($covoiturages as $trajet): ?>
-            <div class="card mb-3 p-3 bg-primary border-black text-black text-center">
-              <h5><?= htmlspecialchars($trajet['chauffeur_pseudo']) ?></h5>
-              <p>
-                Note :
-                <?= htmlspecialchars($trajet['chauffeur_note'] ?? 'Non noté') ?>
-                ★
-              </p>
-              <p>
-                Départ :
-                <?= htmlspecialchars($trajet['depart']) ?>
-              </p>
-              <p>
-                Arrivée :
-                <?= htmlspecialchars($trajet['arrivee']) ?>
-              </p>
-              <p>
-                Date :
-                <?= date('d/m/Y H:i', strtotime($trajet['date_depart'])) ?>
-              </p>
-              <p>
-                Prix :
-                <?= htmlspecialchars(floatval($trajet['prix'])) ?>
-                Crédits
-              </p>
-              <p>
-                Places disponibles :
-                <?= htmlspecialchars($trajet['places_disponibles']) ?>
-              </p>
-              <p>
-                Véhicule :
-                <?= htmlspecialchars($trajet['vehicule_marque']) ?>
-                <?= htmlspecialchars($trajet['vehicule_modele']) ?>
-                <?= htmlspecialchars($trajet['vehicule_energie']) ?>
-              </p>
-              <p>
-                Type de trajet :
-                <?= $trajet['est_ecologique'] ? 'Écologique' : 'Standard' ?>
-              </p>
-              <div class="card mb-3 p-3 bg-primary border-black text-black text-center">
-                <div class="mt-3">
-                  <?php if (isset($_SESSION['user_id'])): ?>
-                    <?php
-                    // On vérifie si une réservation existe pour ce trajet et on récupère son statut
-                    $statut_ma_reservation = $mes_reservations[$trajet['id']] ?? null;
-                    ?>
 
-                    <?php if ($statut_ma_reservation === 'en_attente'): ?>
-                      <button class="btn btn-warning" disabled>Réservation en attente</button>
-                    <?php elseif ($statut_ma_reservation === 'confirmée'): ?>
-                      <button class="btn btn-success" disabled>Réservé</button>
-                    <?php elseif ($statut_ma_reservation === 'refusée'): ?>
-                      <button class="btn btn-danger" disabled>Réservation refusée</button>
-                    <?php elseif ($trajet['places_disponibles'] > 0 && $trajet['chauffeur_id'] != $_SESSION['user_id']): ?>
-                      <button type="button" class="btn btn-dark" onclick="openBookingModal(this)"
-                        data-trajet-id="<?= $trajet['id'] ?>"
-                        data-trajet-info="<?= htmlspecialchars($trajet['depart']) ?> → <?= htmlspecialchars($trajet['arrivee']) ?>"
-                        data-trajet-prix="<?= htmlspecialchars(floatval($trajet['prix'])) ?>">
-                        Réserver
-                      </button>
-                    <?php endif; ?>
+            <div class="row justify-content-center mb-3">
+              <div class="col-md-10 col-lg-8">
+                <div class="card p-3 bg-primary border-black text-black text-center">
+                  <h5><?= htmlspecialchars($trajet['chauffeur_pseudo']) ?></h5>
+                  <p>
+                    Note :
+                    <?= htmlspecialchars($trajet['chauffeur_note'] ?? 'Non noté') ?>
+                    ★
+                  </p>
+                  <p>
+                    Départ :
+                    <?= htmlspecialchars($trajet['depart']) ?>
+                  </p>
+                  <p>
+                    Arrivée :
+                    <?= htmlspecialchars($trajet['arrivee']) ?>
+                  </p>
+                  <p>
+                    Date :
+                    <?= date('d/m/Y H:i', strtotime($trajet['date_depart'])) ?>
+                  </p>
+                  <p>
+                    Prix :
+                    <?= htmlspecialchars(floatval($trajet['prix'])) ?>
+                    Crédits
+                  </p>
+                  <p>
+                    Places disponibles :
+                    <?= htmlspecialchars($trajet['places_disponibles']) ?>
+                  </p>
+                  <p>
+                    Véhicule :
+                    <?= htmlspecialchars($trajet['vehicule_marque']) ?>
+                    <?= htmlspecialchars($trajet['vehicule_modele']) ?>
+                    <?= htmlspecialchars($trajet['vehicule_energie']) ?>
+                  </p>
+                  <p>
+                    Type de trajet :
+                    <?= $trajet['est_ecologique'] ? 'Écologique' : 'Standard' ?>
+                  </p>
+                  <div class="card mb-3 p-3 bg-primary border-black text-black text-center">
+                    <div class="mt-3">
+                      <?php if (isset($_SESSION['user_id'])): ?>
+                        <?php
+                        // On vérifie si une réservation existe pour ce trajet et on récupère son statut
+                        $statut_ma_reservation = $mes_reservations[$trajet['id']] ?? null;
+                        ?>
 
-                    <a href="/profile?id=<?= htmlspecialchars($trajet['chauffeur_id']) ?>" class="btn btn-secondary">Profil Chauffeur</a>
+                        <?php if ($statut_ma_reservation === 'en_attente'): ?>
+                          <button class="btn btn-warning" disabled>Réservation en attente</button>
+                        <?php elseif ($statut_ma_reservation === 'confirmée'): ?>
+                          <button class="btn btn-success" disabled>Réservé</button>
+                        <?php elseif ($statut_ma_reservation === 'refusée'): ?>
+                          <button class="btn btn-danger" disabled>Réservation refusée</button>
+                        <?php elseif ($trajet['places_disponibles'] > 0 && $trajet['chauffeur_id'] != $_SESSION['user_id']): ?>
+                          <button type="button" class="btn btn-dark" onclick="openBookingModal(this)"
+                            data-trajet-id="<?= $trajet['id'] ?>"
+                            data-trajet-info="<?= htmlspecialchars($trajet['depart']) ?> → <?= htmlspecialchars($trajet['arrivee']) ?>"
+                            data-trajet-prix="<?= htmlspecialchars(floatval($trajet['prix'])) ?>">
+                            Réserver
+                          </button>
+                        <?php endif; ?>
 
-                  <?php else: ?>
-                    <a href="/login" class="btn btn-info">Connectez-vous pour réserver</a>
-                  <?php endif; ?>
+                        <a href="/profile?id=<?= htmlspecialchars($trajet['chauffeur_id']) ?>" class="btn btn-secondary">Profil Chauffeur</a>
+
+                      <?php else: ?>
+                        <a href="/login" class="btn btn-info">Connectez-vous pour réserver</a>
+                      <?php endif; ?>
+                    </div>
+                  </div>
                 </div>
               </div>
-            <?php endforeach; ?>
-          <?php else: ?>
-            <div class="alert alert-warning text-center">
-              <p class="mb-0">Aucun covoiturage trouvé avec vos critères de recherche actuels.</p>
+            </div>
+          <?php endforeach; ?>
+        <?php else: ?>
+          <div class="alert alert-warning text-center">
+            <p class="mb-0">Aucun covoiturage trouvé avec vos critères de recherche actuels.</p>
 
-              <?php if (isset($prochaine_date) && $prochaine_date): ?>
-                <hr>
-                <p class="mb-0">
-                  Le prochain départ disponible pour cet itinéraire est le
-                  <strong><?= htmlspecialchars(date('d/m/Y', strtotime($prochaine_date))) ?></strong>.
-                </p>
-                <p>Essayez une nouvelle recherche avec cette date !</p>
-              <?php endif; ?>
-            </div>
-          <?php endif; ?>
-            </div>
+            <?php if (isset($prochaine_date) && $prochaine_date): ?>
+              <hr>
+              <p class="mb-0">
+                Le prochain départ disponible pour cet itinéraire est le
+                <strong><?= htmlspecialchars(date('d/m/Y', strtotime($prochaine_date))) ?></strong>.
+              </p>
+              <p>Essayez une nouvelle recherche avec cette date !</p>
+            <?php endif; ?>
+          </div>
+        <?php endif; ?>
+      </div>
 
 
 
