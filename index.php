@@ -23,17 +23,13 @@ if (file_exists(__DIR__ . '/.env')) {
  */
 function renderView($viewName, $data = [])
 {
-    // Rend les clés du tableau $data accessibles comme des variables locales dans la vue.
     extract($data);
 
-    // Construit le chemin absolu vers le fichier de vue.
-    $viewPath = __DIR__ . '/views/' . $viewName . '.php';
 
+    $viewPath = __DIR__ . '/views/' . $viewName . '.php';
     if (file_exists($viewPath)) {
-        // Inclut le fichier de vue.
         include $viewPath;
     } else {
-        // Gérer le cas où le fichier de vue n'existe pas (ex: afficher une erreur 404).
         http_response_code(404);
         include __DIR__ . '/views/404.php';
     }
