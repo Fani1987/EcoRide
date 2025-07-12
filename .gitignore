@@ -7,7 +7,6 @@ package-lock.json
 
 # PHP
 vendor/
-composer.lock
 
 # Environment
 .env
