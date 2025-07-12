@@ -25,7 +25,7 @@ EcoRide est une plateforme web innovante conçue pour faciliter le covoiturage e
 - **Backend :** PHP
 - **Base de Données :** MySQL / MariaDB (via PDO) / MongoDB (géstion des préférences)
 - **Frontend :** HTML, CSS (Bootstrap), JavaScript
-- **Serveur Web :** Apache / Nginx (généralement avec XAMPP/WAMP pour le développement local)
+- **Serveur Web :** Apache (WAMP pour le développement local)
 
 - **PHPMailer :** Pour la gestion de l'envoi (simulé) des e-mails.
 - **Dotenv :** Pour la gestion des variables d'environnement.
