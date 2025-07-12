@@ -7,7 +7,7 @@
          </div>
 
          <div class="col-6 col-lg-4 ms-auto">
-             <a href="mailto:ecoride@ecoride.fr"><i class="bi bi-envelope"></i></a>
+             <a href="/contact"><i class="bi bi-envelope"></i></a>
          </div>
      </div>
      <div class="modal fade" id="bookingConfirmationModal" tabindex="-1" aria-labelledby="bookingModalLabel" aria-hidden="true">
