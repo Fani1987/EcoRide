@@ -334,23 +334,23 @@ class UserController
 
     public static function handleContactForm(array $postData)
     {
-        // Récupération et validation des données
-        $nom = trim($postData['nom'] ?? '');
+        // CORRECTION : On récupère 'pseudo' au lieu de 'nom'
+        $pseudo = trim($postData['pseudo'] ?? '');
         $emailExpediteur = trim($postData['email'] ?? '');
         $sujet = trim($postData['sujet'] ?? '');
         $message = trim($postData['message'] ?? '');
 
-        if (empty($nom) || empty($emailExpediteur) || !filter_var($emailExpediteur, FILTER_VALIDATE_EMAIL) || empty($sujet) || empty($message)) {
+        // On utilise la variable $pseudo dans la validation
+        if (empty($pseudo) || empty($emailExpediteur) || !filter_var($emailExpediteur, FILTER_VALIDATE_EMAIL) || empty($sujet) || empty($message)) {
             $_SESSION['message'] = ['type' => 'danger', 'text' => 'Tous les champs sont requis et l\'email doit être valide.'];
             header('Location: /contact');
             exit;
         }
 
-        // Configuration de l'envoi d'email avec PHPMailer
         $mail = new PHPMailer(true);
 
         try {
-            // Configuration du serveur SMTP (depuis vos variables d'environnement)
+            // Configuration du serveur SMTP
             $mail->isSMTP();
             $mail->Host       = $_ENV['MAIL_HOST'];
             $mail->SMTPAuth   = true;
@@ -361,20 +361,18 @@ class UserController
             $mail->CharSet    = 'UTF-8';
 
             // Destinataires
-            $mail->setFrom($_ENV['MAIL_USERNAME'], 'Formulaire de Contact EcoRide'); // L'expéditeur est votre compte d'envoi
-            $mail->addAddress('contact@ecoride.fr', 'Support EcoRide');   // L'email de destination de votre entreprise
-            $mail->addReplyTo($emailExpediteur, $nom); // Pour pouvoir répondre directement à l'utilisateur
+            $mail->setFrom($_ENV['MAIL_USERNAME'], 'Formulaire de Contact EcoRide');
+            $mail->addAddress('contact@ecoride.fr', 'Support EcoRide');
+            // CORRECTION : On utilise $pseudo pour le nom de l'expéditeur
+            $mail->addReplyTo($emailExpediteur, $pseudo);
 
             // Contenu
             $mail->isHTML(true);
             $mail->Subject = 'Nouveau message de contact : ' . htmlspecialchars($sujet);
-            $mail->Body    = "Vous avez reçu un nouveau message de <b>" . htmlspecialchars($nom) . "</b> (" . htmlspecialchars($emailExpediteur) . ").<br><br><hr><br>" . nl2br(htmlspecialchars($message));
-            $mail->AltBody = "Vous avez reçu un nouveau message de " . htmlspecialchars($nom) . " (" . htmlspecialchars($emailExpediteur) . ").\n\n" . htmlspecialchars($message);
+            // CORRECTION : On utilise $pseudo dans le corps du mail
+            $mail->Body    = "Vous avez reçu un nouveau message de <b>" . htmlspecialchars($pseudo) . "</b> (" . htmlspecialchars($emailExpediteur) . ").<br><br><hr><br>" . nl2br(htmlspecialchars($message));
+            $mail->AltBody = "Vous avez reçu un nouveau message de " . htmlspecialchars($pseudo) . " (" . htmlspecialchars($emailExpediteur) . ").\n\n" . htmlspecialchars($message);
 
-            // Envoi (simulé ou réel selon votre configuration .env)
-            // $mail->send(); // Nous laissons cette ligne commentée pour suivre notre logique de simulation
-
-            // Pour la simulation, on écrit dans les logs
             error_log("SIMULATION: Email de contact envoyé de " . $emailExpediteur . " avec le sujet : " . $sujet);
 
             $_SESSION['message'] = ['type' => 'success', 'text' => 'Votre message a bien été envoyé. Nous vous répondrons dès que possible.'];

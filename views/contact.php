@@ -11,8 +11,8 @@
                     <div class="card-body bg-primary text-black  p-4">
                         <form action="/contact" method="POST">
                             <div class="mb-3">
-                                <label for="nom" class="form-label">Votre nom</label>
-                                <input type="text" class="form-control" id="nom" name="nom" required>
+                                <label for="pseudo" class="form-label">Votre pseudo</label>
+                                <input type="text" class="form-control" id="pseudo" name="pseudo" required>
                             </div>
                             <div class="mb-3">
                                 <label for="email" class="form-label">Votre adresse e-mail</label>
