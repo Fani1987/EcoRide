@@ -5,11 +5,13 @@ session_start();
 // Inclure l'autoloader de Composer en premier.
 require_once __DIR__ . '/vendor/autoload.php';
 
-// Optionnel: Charger les variables d'environnement avec Dotenv
 use Dotenv\Dotenv;
 
-$dotenv = Dotenv::createImmutable(__DIR__); // Si .env est à la racine du projet
-$dotenv->load();
+// On ne charge le fichier .env que s'il existe (pour le développement local)
+if (file_exists(__DIR__ . '/.env')) {
+    $dotenv = Dotenv::createImmutable(__DIR__);
+    $dotenv->load();
+}
 
 // --- FONCTION D'AIDE POUR LE RENDU DES VUES ---
 /**
