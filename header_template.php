@@ -17,6 +17,17 @@
     <title>EcoRide</title>
 </head>
 
+<?php
+// Afficher les messages flash stockés en session, s'il y en a.
+// Ces messages sont destinés aux vues HTML, pas aux réponses JSON des APIs.
+if (isset($_SESSION['message']) && !$isApiRequest) {
+    echo '<div class="alert alert-' . htmlspecialchars($_SESSION['message']['type']) . '">';
+    echo htmlspecialchars($_SESSION['message']['text']);
+    echo '</div>';
+    unset($_SESSION['message']); // Supprimer le message après l'affichage
+}
+?>
+
 <body>
     <header class="header">
         <nav class="navbar navbar-expand-lg bg-primary" data-bs-theme="bg-dark">

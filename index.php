@@ -2,6 +2,7 @@
 // Démarrer la session PHP au tout début du script
 session_start();
 
+require_once __DIR__ . '/vendor/autoload.php';
 
 use Dotenv\Dotenv;
 
@@ -11,7 +12,6 @@ if (file_exists(__DIR__ . '/.env')) {
     $dotenv->load();
 }
 
-// --- FONCTION D'AIDE POUR LE RENDU DES VUES ---
 /**
  * Fonction globale pour rendre les fichiers de vue.
  * Les données passées seront disponibles comme des variables dans le fichier de vue.
@@ -21,24 +21,18 @@ if (file_exists(__DIR__ . '/.env')) {
  */
 function renderView($viewName, $data = [])
 {
-    // Rend les clés du tableau $data accessibles comme des variables locales
     extract($data);
-
-    // La fonction inclut maintenant l'en-tête, le contenu et le pied de page
     require_once __DIR__ . '/header_template.php';
-
     $viewPath = __DIR__ . '/views/' . $viewName . '.php';
-
     if (file_exists($viewPath)) {
         include $viewPath;
     } else {
         http_response_code(404);
         include __DIR__ . '/views/404.php';
     }
-
     require_once __DIR__ . '/footer_template.php';
 }
-// --- FIN DE LA FONCTION D'AIDE ---
+
 
 
 // Utiliser les classes des contrôleurs avec leurs namespaces
@@ -64,15 +58,6 @@ $isApiRequest = (strpos($path, '/api/') === 0 || $path === '/reserver' || $path 
 // INCLUSION DE L'ENTÊTE (conditionnelle)
 if (!$isApiRequest) {
     require_once __DIR__ . '/header_template.php';
-}
-
-// Afficher les messages flash stockés en session, s'il y en a.
-// Ces messages sont destinés aux vues HTML, pas aux réponses JSON des APIs.
-if (isset($_SESSION['message']) && !$isApiRequest) {
-    echo '<div class="alert alert-' . htmlspecialchars($_SESSION['message']['type']) . '">';
-    echo htmlspecialchars($_SESSION['message']['text']);
-    echo '</div>';
-    unset($_SESSION['message']); // Supprimer le message après l'affichage
 }
 
 // ROUTAGE PRINCIPAL
