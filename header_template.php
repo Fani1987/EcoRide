@@ -69,14 +69,27 @@ if (isset($_SESSION['message'])) {
 
 
                         <?php if (isset($_SESSION['user_id'])): ?>
+                            <?php
+                            // On détermine le bon lien pour le profil en fonction du rôle
+                            $profileLink = '/profile'; // Lien par défaut pour un utilisateur normal
+                            if (isset($_SESSION['user_role'])) {
+                                if ($_SESSION['user_role'] === 'admin') {
+                                    $profileLink = '/admin';
+                                } elseif ($_SESSION['user_role'] === 'employe') {
+                                    $profileLink = '/employees';
+                                }
+                            }
+                            ?>
                             <li class="nav-item">
-                                <a class="nav-link" href="/profile">Profil</a>
+                                <a class="nav-link" href="<?= $profileLink ?>">Mon Espace</a>
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link" href="/logout">Déconnexion</a>
                             </li>
                         <?php else: ?>
-                            <a class="nav-link" href="/login">Connexion</a>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/login">Connexion</a>
+                            </li>
                         <?php endif; ?>
                         </li>
                         <li class="nav-item">
