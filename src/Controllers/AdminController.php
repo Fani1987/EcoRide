@@ -12,7 +12,7 @@ class AdminController
         header('Content-Type: application/json');
 
         try {
-            // Requête 1 : Nombre de covoiturages par jour (cette requête était déjà bonne).
+            // Requête 1 : Nombre de covoiturages par jour.
             $stmt1 = $pdo->prepare("
                 SELECT DATE(date_depart) AS jour, COUNT(*) AS nombre_covoiturages
                 FROM covoiturages

@@ -159,6 +159,7 @@
 </main>
 
 <script>
+  // Fonction pour définir les champs du véhicule comme requis
   function setVehicleFieldsRequired(isRequired) {
     const fields = [
       "car",
@@ -180,7 +181,7 @@
       }
     });
   }
-
+  // Fonction pour afficher/masquer les champs du véhicule en fonction du type d'utilisateur sélectionné
   function toggleVehicleFields() {
     const typeSelect = document.getElementById("type");
     const vehicleFields = document.getElementById("vehicleFields");
@@ -189,10 +190,10 @@
       const showFields =
         selectedType === "Chauffeur" || selectedType === "Passager/Chauffeur";
       vehicleFields.style.display = showFields ? "block" : "none";
-      setVehicleFieldsRequired(showFields); // ✅ Appel ajouté ici
+      setVehicleFieldsRequired(showFields); // Met à jour les champs requis
     }
   }
-
+  // Initialiser l'affichage des champs du véhicule
   document.addEventListener("DOMContentLoaded", function() {
     const typeSelect = document.getElementById("type");
     if (typeSelect) {
@@ -200,7 +201,7 @@
       toggleVehicleFields(); // Initialiser à l'ouverture
     }
 
-    // 🔒 Désactiver la touche Entrée dans le formulaire
+    // Désactiver la touche Entrée dans le formulaire
     const form = document.querySelector("form");
     if (form) {
       form.addEventListener("keydown", function(event) {

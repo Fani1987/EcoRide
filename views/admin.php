@@ -101,6 +101,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <script>
+    // Gestion des formulaires de création d'employé
     document.getElementById('formCreateEmployee').addEventListener('submit', function(e) {
       e.preventDefault();
       fetch('/api/createEmployee', {
@@ -115,7 +116,7 @@
         })
       }).then(res => location.reload());
     });
-
+    // Gestion de la suspension des comptes
     document.getElementById('formSuspendAccount').addEventListener('submit', function(e) {
       e.preventDefault();
       fetch('/api/suspendAccount', {
@@ -129,7 +130,7 @@
         })
       }).then(res => location.reload());
     });
-
+    // Gestion de la réactivation des comptes
     document.getElementById('formReactivateAccount').addEventListener('submit', function(e) {
       e.preventDefault();
       fetch('/api/reactivateAccount', {
@@ -143,7 +144,7 @@
         })
       }).then(res => location.reload());
     });
-
+    // Chargement des statistiques
     fetch('/api/stats')
       .then(response => response.json())
       .then(data => {

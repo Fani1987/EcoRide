@@ -161,6 +161,7 @@ $incidents = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
   <!-- Script JS pour actions dynamiques gestion des avis -->
   <script>
+    // Fonction pour valider un avis
     function validateAvis(button) {
       const row = button.closest('tr');
       fetch('/api/validateAvis', {
@@ -172,7 +173,7 @@ $incidents = $stmt->fetchAll(PDO::FETCH_ASSOC);
           else alert("Erreur : " + data.message);
         });
     }
-
+    // Fonction pour refuser un avis
     function refuseAvis(button) {
       const row = button.closest('tr');
       fetch('/api/refuseAvis', {
@@ -184,7 +185,7 @@ $incidents = $stmt->fetchAll(PDO::FETCH_ASSOC);
           else alert("Erreur : " + data.message);
         });
     }
-
+    // Fonction pour marquer un incident comme traité
     function markIncidentHandled(button) {
       const row = button.closest('tr');
       fetch('/api/markIncidentHandled', {

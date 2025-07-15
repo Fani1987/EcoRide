@@ -19,19 +19,6 @@
 
 </header>
 
-<?php
-// On met l'affichage des messages flash ici pour qu'il soit sur toutes les pages
-if (isset($_SESSION['message'])) {
-    $messageType = $_SESSION['message']['type'];
-    $messageText = $_SESSION['message']['text'];
-    echo '<div class="container mt-3"><div class="alert alert-' . htmlspecialchars($messageType) . ' alert-dismissible fade show" role="alert">';
-    echo htmlspecialchars($messageText);
-    echo '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>';
-    echo '</div></div>';
-    unset($_SESSION['message']);
-}
-?>
-
 <body>
     <header class="header">
         <nav class="navbar navbar-expand-lg bg-primary" data-bs-theme="bg-dark">
@@ -102,6 +89,8 @@ if (isset($_SESSION['message'])) {
     </header>
 
     <?php
+    // Affichage des messages flash
+    // On met l'affichage des messages flash ici pour qu'il soit sur toutes les pages
     if (isset($_SESSION['message'])) {
         $messageType = $_SESSION['message']['type']; // 'success' ou 'danger'
         $messageText = $_SESSION['message']['text'];

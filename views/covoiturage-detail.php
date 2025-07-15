@@ -1,7 +1,7 @@
 <main>
     <div id="main-page" class="bg-primary container mt-5">
         <h1 class="mb-4">Détails du Covoiturage</h1>
-
+        <!-- Vérification si le trajet existe et affichage des informations -->
         <?php if (isset($trajet) && !empty($trajet)): ?>
             <div class="card border-dark mb-4">
                 <div class="card-header bg-dark text-white">
@@ -16,7 +16,7 @@
                     <p><strong>Écologique :</strong> <?= $trajet['est_ecologique'] ? 'Oui <i class="bi bi bi-tree-fill text-success"></i>' : 'Non' ?></p>
                 </div>
             </div>
-
+            <!-- Informations sur le chauffeur et le véhicule -->
             <div class="card border-dark mb-4">
                 <div class="card-header bg-dark text-white">
                     <h2 class="h5 mb-0">Informations sur le Chauffeur</h2>
@@ -38,7 +38,7 @@
                     <p><strong>Immatriculation :</strong> <?= htmlspecialchars($trajet['vehicule_immatriculation']) ?></p>
                 </div>
             </div>
-
+            <!-- Affichage des préférences du chauffeur -->
             <div class="card border-dark mb-4">
                 <div class="card-header bg-dark text-white">
                     <h2 class="h5 mb-0">Préférences du Chauffeur</h2>
@@ -53,7 +53,7 @@
                     <?php endif; ?>
                 </div>
             </div>
-
+            <!-- Affichage des avis sur le chauffeur -->
             <div class="card border-dark mb-4">
                 <div class="card-header bg-dark text-white">
                     <h2 class="h5 mb-0">Avis sur le Chauffeur</h2>
@@ -73,7 +73,7 @@
                     <?php endif; ?>
                 </div>
             </div>
-
+            <!-- Affichage des passagers inscrits -->
             <div class="card border-dark mb-4">
                 <div class="card-header bg-dark text-white">
                     <h2 class="h5 mb-0">Passagers inscrits</h2>
@@ -94,23 +94,23 @@
                     <?php endif; ?>
                 </div>
             </div>
-
+            <!-- Bouton de réservation si l'utilisateur est connecté et n'est pas le chauffeur -->
             <?php if (isset($_SESSION['user_id']) && $_SESSION['user_id'] != $trajet['chauffeur_id']): ?>
                 <?php if ($trajet['places_disponibles'] > 0): ?>
                     <form id="reserverTrajetForm" action="/api/reserverTrajet" method="POST" class="text-center mt-4">
                         <input type="hidden" name="trajet_id" value="<?= htmlspecialchars($trajet['id']) ?>">
                         <button type="submit" class="btn btn-dark btn-lg">Réserver ce trajet</button>
                     </form>
-                <?php else: ?>
+                <?php else: ?> <!-- Si le trajet n'a plus de places disponibles -->
                     <div class="alert alert-warning text-center mt-4">Ce trajet n'a plus de places disponibles.</div>
                 <?php endif; ?>
-            <?php elseif (!isset($_SESSION['user_id'])): ?>
+            <?php elseif (!isset($_SESSION['user_id'])): ?> <!-- Si l'utilisateur n'est pas connecté -->
                 <div class="alert alert-info text-center mt-4">Connectez-vous pour réserver ce trajet.</div>
-            <?php else: ?>
+            <?php else: ?> <!-- Si l'utilisateur est le chauffeur du trajet -->
                 <div class="alert alert-primary text-center mt-4">Vous êtes le chauffeur de ce trajet.</div>
             <?php endif; ?>
 
-        <?php else: ?>
+        <?php else: ?> <!-- Si le trajet n'existe pas -->
             <div class="alert alert-danger" role="alert">
                 Le trajet demandé n'a pas été trouvé.
             </div>
@@ -118,15 +118,16 @@
     </div>
 </main>
 <script>
+    // Script pour gérer la réservation du trajet
     document.addEventListener('DOMContentLoaded', function() {
         const reserverTrajetForm = document.getElementById('reserverTrajetForm');
         if (reserverTrajetForm) {
             reserverTrajetForm.addEventListener('submit', function(e) {
                 e.preventDefault(); // Empêche le rechargement de la page
 
-                const formData = new FormData(this);
+                const formData = new FormData(this); // Récupère les données du formulaire
 
-                fetch(this.action, {
+                fetch(this.action, { // Envoie les données au serveur
                         method: 'POST',
                         body: formData
                     })

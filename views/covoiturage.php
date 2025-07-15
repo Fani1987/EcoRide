@@ -9,7 +9,7 @@
         data-bs-target="#filtreCollapse">
         ☰ Filtres
       </button>
-
+      <!-- Affichage des filtres -->
       <div class="collapse d-md-block" id="filtreCollapse">
         <div
           class="filter-bar p-3 bg-secondary rounded shadow-sm mb-4 d-flex justify-content-center">
@@ -80,7 +80,7 @@
           </form>
         </div>
       </div>
-
+      <!-- Affichage des résultats de la recherche -->
       <div id="covoiturages-results">
         <?php if (!empty($covoiturages)): ?>
           <?php foreach ($covoiturages as $trajet): ?>
@@ -132,7 +132,7 @@
                         // On vérifie si une réservation existe pour ce trajet et on récupère son statut
                         $statut_ma_reservation = $mes_reservations[$trajet['id']] ?? null;
                         ?>
-
+                        <!-- Affichage des boutons de réservation -->
                         <?php if ($statut_ma_reservation === 'en_attente'): ?>
                           <button class="btn btn-warning" disabled>Réservation en attente</button>
                         <?php elseif ($statut_ma_reservation === 'confirmée'): ?>
@@ -147,10 +147,10 @@
                             Réserver
                           </button>
                         <?php endif; ?>
-
+                        <!-- Lien vers le profil du chauffeur -->
                         <a href="/profile?id=<?= htmlspecialchars($trajet['chauffeur_id']) ?>" class="btn btn-secondary">Profil Chauffeur</a>
 
-                      <?php else: ?>
+                      <?php else: ?> <!-- Si l'utilisateur n'est pas connecté -->
                         <a href="/login" class="btn btn-info">Connectez-vous pour réserver</a>
                       <?php endif; ?>
                     </div>
@@ -162,7 +162,7 @@
         <?php else: ?>
           <div class="alert alert-warning text-center">
             <p class="mb-0">Aucun covoiturage trouvé avec vos critères de recherche actuels.</p>
-
+            <!-- Affichage de la prochaine date si disponible -->
             <?php if (isset($prochaine_date) && $prochaine_date): ?>
               <hr>
               <p class="mb-0">

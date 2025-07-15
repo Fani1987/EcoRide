@@ -76,7 +76,7 @@ class AuthController
         $email = trim($postData['email'] ?? '');
         $mdp = $postData['mot_de_passe'] ?? '';
         $type = $postData['type'] ?? '';
-        $prefs = $postData['prefs'] ?? []; // Assurez-vous que c'est un tableau, même si vide
+        $prefs = $postData['prefs'] ?? [];
         $description = trim($postData['description'] ?? '');
 
         $isChauffeur = ($type === 'Chauffeur' || $type === 'Passager/Chauffeur');
@@ -138,8 +138,8 @@ class AuthController
                 $modele = trim($postData['modele'] ?? '');
                 $couleur = trim($postData['couleur'] ?? '');
                 $plaque = trim($postData['plaque_immatriculation'] ?? '');
-                $energie = trim($postData['energie'] ?? ''); // Assurez-vous que ce champ est dans votre formulaire
-                $immat = trim($postData['date_premiere_immat'] ?? ''); // Correction de la faute de frappe et trim
+                $energie = trim($postData['energie'] ?? '');
+                $immat = trim($postData['date_premiere_immat'] ?? '');
 
                 // Valider les champs du véhicule
                 if (empty($marque) || empty($modele) || empty($couleur) || empty($plaque) || empty($energie) || empty($immat)) {
@@ -152,15 +152,6 @@ class AuthController
 
                 $stmt = $pdo->prepare("INSERT INTO vehicules (utilisateur_id, marque, modele, couleur, plaque_immatriculation, energie, date_premiere_immat) VALUES (?, ?, ?, ?, ?, ?, ?)");
                 $stmt->execute([$user_id, $marque, $modele, $couleur, $plaque, $energie, $immat]);
-            }
-
-            // Enregistrer les préférences de l'utilisateur
-            if (!empty($prefs)) {
-                foreach ($prefs as $pref_id) {
-                    // Exemple : insertion dans une table de liaison pour les préférences
-                    // $stmt = $pdo->prepare("INSERT INTO user_preferences (user_id, preference_id) VALUES (?, ?)");
-                    // $stmt->execute([$user_id, $pref_id]);
-                }
             }
 
             // Enregistrer les préférences dans MongoDB

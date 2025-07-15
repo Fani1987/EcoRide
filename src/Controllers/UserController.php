@@ -13,7 +13,7 @@ use PHPMailer\PHPMailer\Exception;
 
 class UserController
 {
-    // Remplacez cette méthode dans UserController.php
+
     public function getUserPreferences(int $mysqlUserId)
     {
         $client = Database::getMongoClient();
@@ -30,7 +30,7 @@ class UserController
         }
     }
 
-    // Remplacez cette méthode dans UserController.php
+
     public function saveUserPreferences(int $mysqlUserId, array $preferences)
     {
         $client = Database::getMongoClient();
@@ -132,7 +132,7 @@ class UserController
             JOIN utilisateurs u ON c.chauffeur_id = u.id
             WHERE r.utilisateur_id = ?
             ORDER BY c.date_depart DESC
-        ");
+        "); // On récupère les trajets réservés par l'utilisateur
         $stmtTrajetsReserves->execute([$userId]);
         $trajetsReserves = $stmtTrajetsReserves->fetchAll(PDO::FETCH_ASSOC);
 
@@ -323,7 +323,7 @@ class UserController
     }
 
     public static function createNotification(PDO $pdo, int $userId, string $message)
-    {
+    { // Fonction pour créer une notification
         try {
             $stmt = $pdo->prepare("INSERT INTO notifications (utilisateur_id, message) VALUES (?, ?)");
             $stmt->execute([$userId, $message]);
@@ -333,8 +333,8 @@ class UserController
     }
 
     public static function handleContactForm(array $postData)
-    {
-        // CORRECTION : On récupère 'pseudo' au lieu de 'nom'
+    { // Fonction pour gérer le formulaire de contact
+        // On vérifie que les données POST contiennent les champs requis
         $pseudo = trim($postData['pseudo'] ?? '');
         $emailExpediteur = trim($postData['email'] ?? '');
         $sujet = trim($postData['sujet'] ?? '');
@@ -363,13 +363,12 @@ class UserController
             // Destinataires
             $mail->setFrom($_ENV['MAIL_USERNAME'], 'Formulaire de Contact EcoRide');
             $mail->addAddress('contact@ecoride.fr', 'Support EcoRide');
-            // CORRECTION : On utilise $pseudo pour le nom de l'expéditeur
+
             $mail->addReplyTo($emailExpediteur, $pseudo);
 
-            // Contenu
+            // Contenu de l'email
             $mail->isHTML(true);
             $mail->Subject = 'Nouveau message de contact : ' . htmlspecialchars($sujet);
-            // CORRECTION : On utilise $pseudo dans le corps du mail
             $mail->Body    = "Vous avez reçu un nouveau message de <b>" . htmlspecialchars($pseudo) . "</b> (" . htmlspecialchars($emailExpediteur) . ").<br><br><hr><br>" . nl2br(htmlspecialchars($message));
             $mail->AltBody = "Vous avez reçu un nouveau message de " . htmlspecialchars($pseudo) . " (" . htmlspecialchars($emailExpediteur) . ").\n\n" . htmlspecialchars($message);
 

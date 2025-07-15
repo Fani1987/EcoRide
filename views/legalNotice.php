@@ -12,14 +12,12 @@
 
   <p>
     <strong>Nom de l’entreprise</strong> : Ecoride<br />
-    <strong>Forme juridique</strong> : [ex. SAS, SARL, auto-entrepreneur]<br />
-    <strong>Capital social</strong> : [à compléter si applicable]<br />
-    <strong>Siège social</strong> : [adresse complète]<br />
-    <strong>Numéro SIRET</strong> : [à compléter]<br />
-    <strong>RCS</strong> : [Ville d’immatriculation]<br />
-    <strong>Responsable de la publication</strong> : [Nom et prénom du
-    dirigeant ou responsable]<br />
-    <strong>Contact</strong> : [adresse e-mail] | [numéro de téléphone]
+    <strong>Forme juridique</strong> : auto-entrepreneur<br />
+    <strong>Siège social</strong> : 2 rue des Voitures Propres, 17900 Elecville<br />
+    <strong>Numéro SIRET</strong> : 12345678900012<br />
+    <strong>RCS</strong> : Elecville<br />
+    <strong>Responsable de la publication</strong> : CAPITAO Estefania<br />
+    <strong>Contact</strong> : ecoride@ecoride.fr
   </p>
 
   <h2 class="bg-secondary text-center text-black">Hébergeur du site</h2>

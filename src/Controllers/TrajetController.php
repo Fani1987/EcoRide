@@ -11,15 +11,15 @@ class TrajetController
 {
 
     public static function ajouterTrajet($pdo, $postData)
-    {
+    { // Permet à un chauffeur d'ajouter un nouveau trajet.
         if (!isset($_SESSION['user_id'])) {
             header('Content-Type: application/json');
             echo json_encode(['success' => false, 'message' => 'Vous devez être connecté pour ajouter un trajet.']);
             exit();
         }
-
+        // On récupère l'ID de l'utilisateur connecté
         $userId = $_SESSION['user_id'];
-
+        // On vérifie que tous les champs requis sont présents
         $requiredFields = ['depart', 'arrivee', 'date_depart', 'date_arrivee', 'prix', 'places_disponibles', 'vehicule_id'];
         foreach ($requiredFields as $field) {
             if (empty($postData[$field])) {
@@ -30,7 +30,7 @@ class TrajetController
         }
 
         $estEcologique = isset($postData['est_ecologique']) ? 1 : 0;
-
+        // On vérifie que l'utilisateur a suffisament de crédits pour ajouter un trajet
         try {
             $pdo->beginTransaction();
 
@@ -46,12 +46,12 @@ class TrajetController
                 echo json_encode(['success' => false, 'message' => 'Crédits insuffisants pour ajouter un trajet.']);
                 exit();
             }
-
+            // On déduit les crédits de l'utilisateur
             $stmtUpdateCredits = $pdo->prepare("UPDATE utilisateurs SET credit = credit - ? WHERE id = ?");
             if (!$stmtUpdateCredits->execute([$costToAddTrajet, $userId])) {
                 throw new PDOException("Failed to update user credits.");
             }
-
+            // On insère le nouveau trajet dans la base de données
             $stmtTrajet = $pdo->prepare("INSERT INTO covoiturages (chauffeur_id, vehicule_id, depart, arrivee, date_depart, prix, places_disponibles, est_ecologique) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
             if (!$stmtTrajet->execute([
                 $userId,
@@ -67,7 +67,7 @@ class TrajetController
             }
 
             $pdo->commit();
-
+            // On envoie un message de succès
             $_SESSION['message'] = ['type' => 'success', 'text' => 'Trajet ajouté avec succès et ' . $costToAddTrajet . ' crédits déduits !'];
             header('Location: /profile');
             exit();
@@ -79,9 +79,8 @@ class TrajetController
             exit();
         }
     }
-
     public static function showTrajetDetail($pdo, $trajetId)
-    {
+    { // Affiche les détails d'un trajet spécifique, y compris les passagers et les avis sur le chauffeur.
         $sql = "SELECT c.*, u.pseudo AS chauffeur_pseudo, u.id AS chauffeur_id,
                        v.marque AS vehicule_marque, v.modele AS vehicule_modele,
                        v.couleur AS vehicule_couleur,
@@ -91,12 +90,12 @@ class TrajetController
                 JOIN vehicules v ON c.vehicule_id = v.id
                 WHERE c.id = ?";
 
-        try {
+        try { // Préparer et exécuter la requête
             $stmt = $pdo->prepare($sql);
             $stmt->execute([$trajetId]);
             $trajet = $stmt->fetch(PDO::FETCH_ASSOC);
-
-            if (!$trajet) {
+            // Vérifier si le trajet existe
+            if (!$trajet) { // Si le trajet n'existe pas, on redirige avec un message d'erreur
                 $_SESSION['message'] = ['type' => 'error', 'text' => 'Trajet non trouvé.'];
                 header('Location: /covoiturage');
                 exit();
@@ -124,7 +123,7 @@ class TrajetController
                 'preferences' => $preferences, // <-- On envoie les préférences à la vue
                 'isDriver' => (isset($_SESSION['user_id']) && $_SESSION['user_id'] == $trajet['chauffeur_id'])
             ];
-
+            // On utilise une méthode de rendu de vue pour afficher les détails du trajet
             \renderView('covoiturage-detail', $data);
         } catch (PDOException $e) {
             error_log("Erreur lors de la récupération des détails du trajet : " . $e->getMessage());
@@ -135,7 +134,7 @@ class TrajetController
     }
 
     public static function participerTrajet($pdo, $trajet_id, $user_id)
-    {
+    { // Permet à un utilisateur de participer à un trajet en réservant une place.
         try {
             $pdo->beginTransaction();
 
@@ -197,6 +196,7 @@ class TrajetController
             }
 
             // 5. Incrémenter les crédits du chauffeur
+            // Commenté car la logique de crédit du chauffeur est gérée différemment
             //$stmtAddCreditsChauffeur = $pdo->prepare("UPDATE utilisateurs SET credit = credit + ? WHERE id = ?");
             //if (!$stmtAddCreditsChauffeur->execute([$trajet['prix'], $trajet['chauffeur_id']])) {
             //header('Content-Type: application/json');
@@ -315,7 +315,8 @@ class TrajetController
             // Mettre à jour le statut du covoiturage
             $updateStmt = $pdo->prepare("UPDATE covoiturages SET statut = 'en_cours' WHERE id = ? AND statut = 'planifié'");
             $updateStmt->execute([$trajet_id]);
-
+            // Si la mise à jour a réussi, on renvoie un message de succès
+            // Sinon, on renvoie un message d'erreur
             if ($updateStmt->rowCount() > 0) {
                 echo json_encode(['success' => true, 'message' => 'Trajet démarré avec succès.']);
             } else {

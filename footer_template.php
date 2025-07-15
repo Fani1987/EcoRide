@@ -10,6 +10,7 @@
              <a href="/contact"><i class="bi bi-envelope"></i></a>
          </div>
      </div>
+     <!-- Modal de confirmation de réservation -->
      <div class="modal fade" id="bookingConfirmationModal" tabindex="-1" aria-labelledby="bookingModalLabel" aria-hidden="true">
          <div class="modal-dialog">
              <div class="modal-content">
