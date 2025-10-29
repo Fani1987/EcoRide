@@ -4,49 +4,36 @@ namespace App\Controllers;
 
 use PDO;
 use PDOException;
+use App\Models\AdminModel; // <-- 1. On IMPORTE le nouveau Modèle
 
 class AdminController
 {
+    /**
+     * Récupère les statistiques pour le tableau de bord de l'administrateur.
+     * Le contrôleur ne contient plus de SQL.
+     */
     public static function getStats(PDO $pdo): void
     {
         header('Content-Type: application/json');
 
         try {
-            // Requête 1 : Nombre de covoiturages par jour.
-            $stmt1 = $pdo->prepare("
-                SELECT DATE(date_depart) AS jour, COUNT(*) AS nombre_covoiturages
-                FROM covoiturages
-                GROUP BY DATE(date_depart)
-                ORDER BY jour ASC
-            ");
-            $stmt1->execute();
-            $covoituragesParJour = $stmt1->fetchAll(PDO::FETCH_ASSOC);
+            // 2. On instancie le Modèle
+            $adminModel = new AdminModel($pdo);
 
-            // Requête 2 : Crédits gagnés par jour (2 crédits par trajet).
-            $stmt2 = $pdo->prepare("
-                SELECT DATE(date_depart) AS jour, (COUNT(*) * 2) AS credits_gagnes
-                FROM covoiturages
-                GROUP BY DATE(date_depart)
-                ORDER BY jour ASC
-            ");
-            $stmt2->execute();
-            $creditsParJour = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+            // 3. On appelle les méthodes du Modèle
+            $covoituragesParJour = $adminModel->getCovoituragesParJour();
+            $creditsParJour = $adminModel->getCreditsParJour();
+            $totalCredits = $adminModel->getTotalCreditsGagnes();
 
-            // Requête 3 : Total des crédits gagnés par la plateforme.
-            $stmt3 = $pdo->prepare("
-                SELECT (COUNT(*) * 2) AS total_credits
-                FROM covoiturages
-            ");
-            $stmt3->execute();
-            $totalCredits = $stmt3->fetch(PDO::FETCH_ASSOC);
-
+            // 4. Le contrôleur se charge de formater la réponse JSON
             echo json_encode([
                 'covoiturages_par_jour' => $covoituragesParJour,
                 'credits_par_jour' => $creditsParJour,
-                'total_credits' => $totalCredits['total_credits'] ?? 0
+                'total_credits' => $totalCredits
             ]);
         } catch (PDOException $e) {
             http_response_code(500);
+            error_log("Erreur dans AdminController::getStats : " . $e->getMessage());
             echo json_encode(['error' => 'Erreur lors de la récupération des statistiques.']);
         }
     }

@@ -1,33 +1,3 @@
-<?php
-require_once __DIR__ . '/../vendor/autoload.php';
-
-use App\Core\Database;
-// Chemin vers le fichier de configuration de la base de données
-$pdo = Database::getInstance();
-// Requête pour récupérer les incidents non traités
-$query = "
-    SELECT 
-        i.id AS incident_id,
-        c.id AS covoiturage_id,
-        u_conducteur.pseudo AS conducteur_pseudo,
-        u_passager.pseudo AS passager_pseudo,
-        DATE_FORMAT(c.date_depart, '%d/%m/%Y') AS date_trajet,
-        CONCAT(c.depart, ' → ', c.arrivee) AS lieu,
-        i.commentaire AS description
-    FROM incidents i
-    JOIN reservations r ON i.reservation_id = r.id
-    JOIN covoiturages c ON r.covoiturage_id = c.id
-    JOIN utilisateurs u_conducteur ON c.chauffeur_id = u_conducteur.id
-    JOIN utilisateurs u_passager ON r.utilisateur_id = u_passager.id
-    WHERE i.statut = 'ouvert'
-    ORDER BY i.date_creation DESC
-";
-
-$stmt = $pdo->prepare($query);
-$stmt->execute();
-$incidents = $stmt->fetchAll(PDO::FETCH_ASSOC);
-?>
-
 <main>
   <div class="container mt-5">
     <h2 class="card border-dark bg-primary text-center text-black mb-4">
@@ -36,7 +6,6 @@ $incidents = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     <h1 class="mb-4">Gestion des avis</h1>
 
-    <!-- Section validation des avis -->
     <section class="mb-5">
       <h2 class="text-dark">Avis à valider</h2>
       <div class="table-responsive">
@@ -52,15 +21,12 @@ $incidents = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
           <tbody>
             <?php
-            // Requête pour les avis en attente
-            $stmt = $pdo->prepare("SELECT a.id, u.pseudo AS nom, a.note, a.commentaire FROM avis a JOIN utilisateurs u ON a.utilisateur_id = u.id WHERE a.statut = 'en_attente'");
-            $stmt->execute();
-            $avis = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-            if (count($avis) === 0) {
+            // La logique SQL est maintenant dans le contrôleur.
+            // On utilise la variable $avisEnAttente fournie par EmployeeController::showDashboard
+            if (empty($avisEnAttente)) {
               echo '<tr><td colspan="4" class="text-center text-muted">Aucun avis en attente de validation.</td></tr>';
             } else {
-              foreach ($avis as $avisItem) {
+              foreach ($avisEnAttente as $avisItem) {
                 echo '<tr>';
                 echo '<td>' . htmlspecialchars($avisItem['nom']) . '</td>';
                 echo '<td>' . htmlspecialchars($avisItem['note']) . '/5</td>';
@@ -83,7 +49,6 @@ $incidents = $stmt->fetchAll(PDO::FETCH_ASSOC);
         </table>
       </div>
     </section>
-    <!-- Section avis validés -->
     <section>
       <h2 class="text-dark">Avis validés</h2>
       <div class="table-responsive">
@@ -97,17 +62,17 @@ $incidents = $stmt->fetchAll(PDO::FETCH_ASSOC);
           </thead>
           <tbody>
             <?php
-            // Requête pour les avis déjà validés
-            $stmt = $pdo->prepare("SELECT u.pseudo AS nom, a.note, a.commentaire FROM avis a JOIN utilisateurs u ON a.utilisateur_id = u.id WHERE a.statut = 'validé'");
-            $stmt->execute();
-            $avisValides = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-            foreach ($avisValides as $avisItem) {
-              echo '<tr>';
-              echo '<td>' . htmlspecialchars($avisItem['nom']) . '</td>';
-              echo '<td>' . htmlspecialchars($avisItem['note']) . '/5</td>';
-              echo '<td>' . htmlspecialchars($avisItem['commentaire']) . '</td>';
-              echo '</tr>';
+            // On utilise la variable $avisValides fournie par le contrôleur
+            if (empty($avisValides)) {
+              echo '<tr><td colspan="3" class="text-center text-muted">Aucun avis validé pour le moment.</td></tr>';
+            } else {
+              foreach ($avisValides as $avisItem) {
+                echo '<tr>';
+                echo '<td>' . htmlspecialchars($avisItem['nom']) . '</td>';
+                echo '<td>' . htmlspecialchars($avisItem['note']) . '/5</td>';
+                echo '<td>' . htmlspecialchars($avisItem['commentaire']) . '</td>';
+                echo '</tr>';
+              }
             }
             ?>
           </tbody>
@@ -116,11 +81,11 @@ $incidents = $stmt->fetchAll(PDO::FETCH_ASSOC);
     </section>
 
     <h1 class="mb-4">Gestion des incidents</h1>
-    <!-- Section covoiturages problématiques -->
     <section class="mt-5">
       <h2 class="text-dark">Covoiturages signalés</h2>
       <div class="table-responsive">
-        <?php if (empty($incidents)): ?>
+        <?php if (empty($incidentsOuverts)): // On utilise la variable $incidentsOuverts 
+        ?>
           <div class="alert alert-info">Aucun incident signalé à traiter.</div>
         <?php else: ?>
           <table class="table table-bordered table-hover responsive-table">
@@ -136,7 +101,8 @@ $incidents = $stmt->fetchAll(PDO::FETCH_ASSOC);
               </tr>
             </thead>
             <tbody>
-              <?php foreach ($incidents as $incident): ?>
+              <?php foreach ($incidentsOuverts as $incident): // On utilise la variable $incidentsOuverts 
+              ?>
                 <tr>
                   <td><?= htmlspecialchars($incident['covoiturage_id']) ?></td>
                   <td><?= htmlspecialchars($incident['conducteur_pseudo']) ?></td>
@@ -159,43 +125,4 @@ $incidents = $stmt->fetchAll(PDO::FETCH_ASSOC);
     </section>
   </div>
 
-  <!-- Script JS pour actions dynamiques gestion des avis -->
-  <script>
-    // Fonction pour valider un avis
-    function validateAvis(button) {
-      const row = button.closest('tr');
-      fetch('/api/validateAvis', {
-          method: 'POST'
-        })
-        .then(res => res.json())
-        .then(data => {
-          if (data.success) row.remove();
-          else alert("Erreur : " + data.message);
-        });
-    }
-    // Fonction pour refuser un avis
-    function refuseAvis(button) {
-      const row = button.closest('tr');
-      fetch('/api/refuseAvis', {
-          method: 'POST'
-        })
-        .then(res => res.json())
-        .then(data => {
-          if (data.success) row.remove();
-          else alert("Erreur : " + data.message);
-        });
-    }
-    // Fonction pour marquer un incident comme traité
-    function markIncidentHandled(button) {
-      const row = button.closest('tr');
-      fetch('/api/markIncidentHandled', {
-          method: 'POST'
-        })
-        .then(res => res.json())
-        .then(data => {
-          if (data.success) row.remove();
-          else alert("Erreur : " + data.message);
-        });
-    }
-  </script>
 </main>

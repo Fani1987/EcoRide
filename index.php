@@ -124,7 +124,8 @@ switch ($path) {
             header('Location: /login');
             exit();
         }
-        renderView('employees');
+        // Appelle le contrôleur qui va chercher les données et rendre la vue
+        EmployeeController::showDashboard($pdo);
         break;
 
     case '/admin':
@@ -133,25 +134,6 @@ switch ($path) {
             exit();
         }
         renderView('admin');
-        break;
-
-    case '/reserver':
-        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SESSION['user_id'])) {
-            $input = file_get_contents('php://input');
-            $data = json_decode($input, true);
-
-            if (isset($data['trajet_id'])) {
-                TrajetController::participerTrajet($pdo, $data['trajet_id'], $_SESSION['user_id']);
-            } else {
-                header('Content-Type: application/json');
-                echo json_encode(['success' => false, 'message' => 'ID de trajet manquant dans la requête.']);
-                exit;
-            }
-        } else {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'message' => 'Requête invalide ou utilisateur non connecté.']);
-            exit;
-        }
         break;
 
     case '/buy-credits':

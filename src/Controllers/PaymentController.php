@@ -4,16 +4,19 @@ namespace App\Controllers;
 
 use PDO;
 use PDOException;
+use App\Models\UserModel; // <-- 1. On IMPORTE le UserModel
 
 class PaymentController
 {
+    /**
+     * Gère la "simulation" d'achat de crédits.
+     */
     public static function processCreditPurchase(PDO $pdo, array $postData)
     {
         if (!isset($_SESSION['user_id'])) {
             header('Location: /login');
             exit;
         }
-
         $userId = $_SESSION['user_id'];
         $creditsToAdd = (int)($postData['credit_pack'] ?? 0);
 
@@ -24,15 +27,15 @@ class PaymentController
         }
 
         // --- SIMULATION DU PAIEMENT ---
-        // Dans une vraie application, ici on appellerait une API de paiement (Stripe, PayPal...).
-        // On enverrait le montant (par ex., $creditsToAdd . '€'), on attendrait la confirmation.
-        // Pour notre projet, nous simulons simplement que le paiement a réussi.
-        $paymentSuccess = true;
+        $paymentSuccess = true; // Simulation de paiement réussi
 
         if ($paymentSuccess) {
             try {
-                $stmt = $pdo->prepare("UPDATE utilisateurs SET credit = credit + ? WHERE id = ?");
-                $stmt->execute([$creditsToAdd, $userId]);
+                // 2. Instancier le Modèle
+                $userModel = new UserModel($pdo);
+
+                // 3. Appeler la méthode du Modèle (plus de SQL ici !)
+                $userModel->creditCredits($userId, $creditsToAdd);
 
                 $_SESSION['message'] = ['type' => 'success', 'text' => $creditsToAdd . ' crédits ont été ajoutés à votre compte !'];
                 header('Location: /profile');
@@ -43,6 +46,11 @@ class PaymentController
                 header('Location: /buy-credits');
                 exit;
             }
+        } else {
+            // Logique si le paiement échoue
+            $_SESSION['message'] = ['type' => 'danger', 'text' => 'Le paiement a échoué.'];
+            header('Location: /buy-credits');
+            exit;
         }
     }
 }

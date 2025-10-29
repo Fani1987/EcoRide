@@ -175,6 +175,69 @@
         <?php endif; ?>
       </div>
 
+      <script>
+        // Assurez-vous que le DOM est chargé
+        document.addEventListener('DOMContentLoaded', function() {
 
+          // Crée une instance du modal Bootstrap
+          const bookingModal = new bootstrap.Modal(document.getElementById('bookingModal'));
+          const confirmBtn = document.getElementById('confirmBookingBtn');
+          let currentTrajetId = null;
+
+          // 1. Fonction pour ouvrir le modal (celle appelée par votre bouton onclick)
+          window.openBookingModal = function(button) {
+            // Récupère les données depuis les attributs data-* du bouton
+            currentTrajetId = button.getAttribute('data-trajet-id');
+            const info = button.getAttribute('data-trajet-info');
+            const prix = button.getAttribute('data-trajet-prix');
+
+            // Met à jour le contenu du modal
+            document.getElementById('modalTrajetInfo').textContent = info;
+            document.getElementById('modalTrajetPrix').textContent = prix;
+
+            // Ouvre le modal
+            bookingModal.show();
+          }
+
+          // 2. Ajoute l'événement au clic sur le bouton de confirmation
+          confirmBtn.addEventListener('click', function() {
+            if (!currentTrajetId) return;
+
+            // Désactive le bouton pour éviter les double-clics
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = 'Réservation en cours...';
+
+            // 3. Logique de Fetch (corrigée pour envoyer du JSON)
+            fetch('/api/reserverTrajet', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  trajet_id: currentTrajetId
+                })
+              })
+              .then(response => response.json())
+              .then(data => {
+                if (data.success) {
+                  alert(data.message);
+                  // Recharge la page pour mettre à jour l'état des boutons
+                  window.location.reload();
+                } else {
+                  alert('Erreur: ' + data.message);
+                  confirmBtn.disabled = false;
+                  confirmBtn.textContent = 'Confirmer et payer';
+                }
+              })
+              .catch(error => {
+                console.error('Erreur:', error);
+                alert('Une erreur réseau est survenue.');
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = 'Confirmer et payer';
+              });
+          });
+
+        });
+      </script>
 
 </main>

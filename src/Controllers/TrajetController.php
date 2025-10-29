@@ -7,20 +7,31 @@ use PDOException;
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
+// On importe TOUS les modèles dont on a besoin
+use App\Models\TrajetModel;
+use App\Models\ReservationModel;
+use App\Models\UserModel;
+use App\Models\AvisModel;
+use App\Controllers\UserController; // On le garde pour la logique MongoDB
+
 class TrajetController
 {
-
-    public static function ajouterTrajet($pdo, $postData)
-    { // Permet à un chauffeur d'ajouter un nouveau trajet.
+    /**
+     * Gère la création d'un trajet (covoiturage).
+     * Le contrôleur gère la validation, la session, et la transaction.
+     */
+    public static function ajouterTrajet(PDO $pdo, array $postData)
+    {
         if (!isset($_SESSION['user_id'])) {
             header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'message' => 'Vous devez être connecté pour ajouter un trajet.']);
+            echo json_encode(['success' => false, 'message' => 'Vous devez être connecté.']);
             exit();
         }
-        // On récupère l'ID de l'utilisateur connecté
         $userId = $_SESSION['user_id'];
-        // On vérifie que tous les champs requis sont présents
-        $requiredFields = ['depart', 'arrivee', 'date_depart', 'date_arrivee', 'prix', 'places_disponibles', 'vehicule_id'];
+        $costToAddTrajet = 2; // Coût fixe de 2 crédits
+
+        // 1. Validation des données
+        $requiredFields = ['depart', 'arrivee', 'date_depart', 'prix', 'places_disponibles', 'vehicule_id'];
         foreach ($requiredFields as $field) {
             if (empty($postData[$field])) {
                 header('Content-Type: application/json');
@@ -29,272 +40,215 @@ class TrajetController
             }
         }
 
-        $estEcologique = isset($postData['est_ecologique']) ? 1 : 0;
-        // On vérifie que l'utilisateur a suffisament de crédits pour ajouter un trajet
         try {
+            // 2. Démarrer la transaction
             $pdo->beginTransaction();
 
-            $stmtCredits = $pdo->prepare("SELECT credit FROM utilisateurs WHERE id = ? FOR UPDATE");
-            $stmtCredits->execute([$userId]);
-            $currentCredits = $stmtCredits->fetchColumn();
+            // 3. Instancier les modèles
+            $userModel = new UserModel($pdo);
+            $trajetModel = new TrajetModel($pdo);
 
-            $costToAddTrajet = 2;
-
+            // 4. Logique métier : Vérifier et déduire les crédits
+            $currentCredits = $userModel->getCreditsForUpdate($userId); // FOR UPDATE verrouille la ligne
             if ($currentCredits === false || $currentCredits < $costToAddTrajet) {
-                $pdo->rollBack();
-                header('Content-Type: application/json');
-                echo json_encode(['success' => false, 'message' => 'Crédits insuffisants pour ajouter un trajet.']);
-                exit();
-            }
-            // On déduit les crédits de l'utilisateur
-            $stmtUpdateCredits = $pdo->prepare("UPDATE utilisateurs SET credit = credit - ? WHERE id = ?");
-            if (!$stmtUpdateCredits->execute([$costToAddTrajet, $userId])) {
-                throw new PDOException("Failed to update user credits.");
-            }
-            // On insère le nouveau trajet dans la base de données
-            $stmtTrajet = $pdo->prepare("INSERT INTO covoiturages (chauffeur_id, vehicule_id, depart, arrivee, date_depart, prix, places_disponibles, est_ecologique) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-            if (!$stmtTrajet->execute([
-                $userId,
-                $postData['vehicule_id'],
-                $postData['depart'],
-                $postData['arrivee'],
-                $postData['date_depart'],
-                $postData['prix'],
-                $postData['places_disponibles'],
-                $estEcologique
-            ])) {
-                throw new PDOException("Failed to insert new trajet.");
+                throw new \Exception('Crédits insuffisants pour ajouter un trajet.');
             }
 
+            if (!$userModel->debitCredits($userId, $costToAddTrajet)) {
+                throw new \Exception('La mise à jour des crédits a échoué.');
+            }
+
+            // 5. Logique métier : Créer le trajet
+            $trajetCree = $trajetModel->create(
+                $userId,
+                (int)$postData['vehicule_id'],
+                ($postData['depart']),
+                ($postData['arrivee']),
+                ($postData['date_depart']),
+                (float)$postData['prix'],
+                (int)$postData['places_disponibles'],
+                isset($postData['est_ecologique']) ? 1 : 0
+            );
+
+            if (!$trajetCree) {
+                throw new \Exception('La création du trajet a échoué.');
+            }
+
+            // 6. Valider la transaction
             $pdo->commit();
-            // On envoie un message de succès
+
+            // 7. Réponse (Redirection)
             $_SESSION['message'] = ['type' => 'success', 'text' => 'Trajet ajouté avec succès et ' . $costToAddTrajet . ' crédits déduits !'];
-            header('Location: /profile');
+            header('Location: /profile'); // Redirection vers le profil
             exit();
-        } catch (PDOException $e) {
+        } catch (\Exception $e) { // On "catch" \Exception pour tout attraper (PDOException et nos \Exception)
+            // 8. Gestion des erreurs
             $pdo->rollBack();
-            error_log("Erreur lors de l'ajout de trajet (TrajetController::ajouterTrajet) : " . $e->getMessage());
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'message' => 'Une erreur est survenue lors de l\'ajout du trajet. Veuillez réessayer.']);
+            error_log("Erreur lors de l'ajout de trajet : " . $e->getMessage());
+
+            // On peut choisir de répondre en JSON (si c'est une API) ou de rediriger
+            $_SESSION['message'] = ['type' => 'danger', 'text' => $e->getMessage()];
+            header('Location: /profile'); // Redirection vers le profil avec un message d'erreur
             exit();
         }
     }
-    public static function showTrajetDetail($pdo, $trajetId)
-    { // Affiche les détails d'un trajet spécifique, y compris les passagers et les avis sur le chauffeur.
-        $sql = "SELECT c.*, u.pseudo AS chauffeur_pseudo, u.id AS chauffeur_id,
-                       v.marque AS vehicule_marque, v.modele AS vehicule_modele,
-                       v.couleur AS vehicule_couleur,
-                       v.plaque_immatriculation AS vehicule_immatriculation
-                FROM covoiturages c
-                JOIN utilisateurs u ON c.chauffeur_id = u.id
-                JOIN vehicules v ON c.vehicule_id = v.id
-                WHERE c.id = ?";
 
-        try { // Préparer et exécuter la requête
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute([$trajetId]);
-            $trajet = $stmt->fetch(PDO::FETCH_ASSOC);
-            // Vérifier si le trajet existe
-            if (!$trajet) { // Si le trajet n'existe pas, on redirige avec un message d'erreur
+    /**
+     * Affiche la page de détail d'un trajet
+     */
+    public static function showTrajetDetail(PDO $pdo, int $trajetId)
+    {
+        try {
+            // 1. Instancier les modèles
+            $trajetModel = new TrajetModel($pdo);
+            $reservationModel = new ReservationModel($pdo);
+            $avisModel = new AvisModel($pdo);
+            $userController = new UserController(); // Pour la logique MongoDB des préférences
+
+            // 2. Récupérer les données via les modèles
+            $trajet = $trajetModel->findFullTrajetById($trajetId);
+
+            if (!$trajet) {
                 $_SESSION['message'] = ['type' => 'error', 'text' => 'Trajet non trouvé.'];
                 header('Location: /covoiturage');
                 exit();
             }
 
-            // 1. Récupérer les passagers
-            $sqlPassagers = "SELECT u.id, u.pseudo FROM reservations r JOIN utilisateurs u ON r.utilisateur_id = u.id WHERE r.covoiturage_id = ?";
-            $stmtPassagers = $pdo->prepare($sqlPassagers);
-            $stmtPassagers->execute([$trajetId]);
-            $passagers = $stmtPassagers->fetchAll(PDO::FETCH_ASSOC);
+            // On sépare la récupération des données
+            $passagers = $reservationModel->getPassagersByTrajet($trajetId);
+            $avis = $avisModel->getChauffeurAvisValides($trajet['chauffeur_id']);
+            $preferences = $userController->getUserPreferences($trajet['chauffeur_id']); // Logique Mongo
 
-            // 2. Récupérer les avis sur le chauffeur
-            $stmtAvis = $pdo->prepare("SELECT a.note, a.commentaire, u_auteur.pseudo AS auteur FROM avis a JOIN utilisateurs u_auteur ON a.utilisateur_id = u_auteur.id WHERE a.covoiturage_id IN (SELECT id FROM covoiturages WHERE chauffeur_id = ?)");
-            $stmtAvis->execute([$trajet['chauffeur_id']]);
-            $avis = $stmtAvis->fetchAll(PDO::FETCH_ASSOC);
-
-            // 3. Récupérer les préférences du chauffeur depuis MongoDB
-            $userController = new UserController();
-            $preferences = $userController->getUserPreferences($trajet['chauffeur_id']);
-
+            // 3. Préparer les données pour la vue
             $data = [
                 'trajet' => $trajet,
                 'passagers' => $passagers,
-                'avis' => $avis,               // <-- On envoie les avis à la vue
-                'preferences' => $preferences, // <-- On envoie les préférences à la vue
+                'avis' => $avis,
+                'preferences' => $preferences,
                 'isDriver' => (isset($_SESSION['user_id']) && $_SESSION['user_id'] == $trajet['chauffeur_id'])
             ];
-            // On utilise une méthode de rendu de vue pour afficher les détails du trajet
+
+            // 4. Rendre la vue
             \renderView('covoiturage-detail', $data);
         } catch (PDOException $e) {
-            error_log("Erreur lors de la récupération des détails du trajet : " . $e->getMessage());
+            error_log("Erreur showTrajetDetail : " . $e->getMessage());
             $_SESSION['message'] = ['type' => 'error', 'text' => 'Erreur lors de la récupération des détails du trajet.'];
             header('Location: /covoiturage');
             exit();
         }
     }
 
-    public static function participerTrajet($pdo, $trajet_id, $user_id)
-    { // Permet à un utilisateur de participer à un trajet en réservant une place.
-        try {
-            $pdo->beginTransaction();
-
-            // 1. Vérifier si l'utilisateur est déjà inscrit à ce trajet
-            $stmtCheck = $pdo->prepare("SELECT COUNT(*) FROM reservations WHERE utilisateur_id = ? AND covoiturage_id = ?");
-            $stmtCheck->execute([$user_id, $trajet_id]);
-            if ($stmtCheck->fetchColumn() > 0) {
-                $pdo->rollBack();
-                header('Content-Type: application/json');
-                echo json_encode(['success' => false, 'message' => 'Vous êtes déjà inscrit à ce trajet.']);
-                exit();
-            }
-
-            // 2. Récupérer les infos du trajet et verrouiller la ligne pour la transaction
-            $stmtTrajet = $pdo->prepare("SELECT prix, places_disponibles, chauffeur_id FROM covoiturages WHERE id = ? FOR UPDATE");
-            $stmtTrajet->execute([$trajet_id]);
-            $trajet = $stmtTrajet->fetch(PDO::FETCH_ASSOC);
-
-            if (!$trajet) {
-                $pdo->rollBack();
-                header('Content-Type: application/json');
-                echo json_encode(['success' => false, 'message' => 'Trajet non trouvé.']);
-                exit();
-            }
-
-            if ($trajet['places_disponibles'] <= 0) {
-                $pdo->rollBack();
-                header('Content-Type: application/json');
-                echo json_encode(['success' => false, 'message' => 'Plus de places disponibles pour ce trajet.']);
-                exit();
-            }
-
-            // Empêcher le chauffeur de réserver son propre trajet
-            if ($trajet['chauffeur_id'] == $user_id) {
-                $pdo->rollBack();
-                header('Content-Type: application/json');
-                echo json_encode(['success' => false, 'message' => 'Vous ne pouvez pas réserver votre propre trajet.']);
-                exit();
-            }
-
-            // 3. Vérifier les crédits de l'utilisateur qui réserve
-            $stmtCredits = $pdo->prepare("SELECT credit FROM utilisateurs WHERE id = ? FOR UPDATE");
-            $stmtCredits->execute([$user_id]);
-            $currentCredits = $stmtCredits->fetchColumn();
-
-            if ($currentCredits === false || $currentCredits < $trajet['prix']) {
-                $pdo->rollBack();
-                header('Content-Type: application/json');
-                echo json_encode(['success' => false, 'message' => 'Crédits insuffisants pour réserver ce trajet.']);
-                exit();
-            }
-
-            // 4. Déduire les crédits du passager
-            $stmtUpdateCredits = $pdo->prepare("UPDATE utilisateurs SET credit = credit - ? WHERE id = ?");
-            if (!$stmtUpdateCredits->execute([$trajet['prix'], $user_id])) {
-                header('Content-Type: application/json');
-                echo json_encode(['success' => false, 'message' => 'La mise à jour des crédits du passager a échoué.']);
-                exit();
-            }
-
-            // 5. Incrémenter les crédits du chauffeur
-            // Commenté car la logique de crédit du chauffeur est gérée différemment
-            //$stmtAddCreditsChauffeur = $pdo->prepare("UPDATE utilisateurs SET credit = credit + ? WHERE id = ?");
-            //if (!$stmtAddCreditsChauffeur->execute([$trajet['prix'], $trajet['chauffeur_id']])) {
-            //header('Content-Type: application/json');
-            //echo json_encode(['success' => false, 'message' => 'La mise à jour des crédits du chauffeur a échoué.']);
-            //exit();
-            //}
-
-            // 6. Décrémenter les places disponibles
-            $stmtUpdatePlaces = $pdo->prepare("UPDATE covoiturages SET places_disponibles = places_disponibles - 1 WHERE id = ?");
-            if (!$stmtUpdatePlaces->execute([$trajet_id])) {
-                header('Content-Type: application/json');
-                echo json_encode(['success' => false, 'message' => 'La mise à jour des places disponibles a échoué.']);
-                exit();
-            }
-
-            // 7. Insérer la réservation
-            $stmtReservation = $pdo->prepare("INSERT INTO reservations (utilisateur_id, covoiturage_id, date_reservation, statut) VALUES (?, ?, NOW(), ?)");
-            if (!$stmtReservation->execute([$user_id, $trajet_id, 'en_attente'])) {
-                header('Content-Type: application/json');
-                echo json_encode(['success' => false, 'message' => 'L\'insertion de la réservation a échoué.']);
-                exit();
-            }
-
-            // Si tout s'est bien passé, valider la transaction et renvoyer JSON
-            $pdo->commit();
-            header('Content-Type: application/json');
-            echo json_encode(['success' => true, 'message' => 'Réservation effectuée avec succès !']);
-            exit;
-        } catch (PDOException $e) {
-            $pdo->rollBack();
-            error_log("Erreur lors de la réservation : " . $e->getMessage());
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'message' => 'Une erreur est survenue lors de la réservation. Veuillez réessayer.']);
-            exit;
-        }
-    }
-
-    public static function confirmerReservation(PDO $pdo, int $reservation_id, string $statut)
+    /**
+     * Gère la réservation d'un trajet par un passager
+     */
+    public static function participerTrajet(PDO $pdo, int $trajetId, int $userId)
     {
-        // Permet à un chauffeur de confirmer ou refuser une réservation.
-
-        // On vérifie que le statut demandé est valide
-        $statuts_valides = ['confirmée', 'refusée'];
-        if (!in_array($statut, $statuts_valides)) {
-            echo json_encode(['success' => false, 'message' => 'Statut invalide.']);
-            exit;
-        }
-        // On vérifie que le chauffeur est bien connecté
-        if (!isset($_SESSION['user_id'])) {
-            echo json_encode(['success' => false, 'message' => 'Vous devez être connecté.']);
-            exit;
-        }
-
-        $chauffeur_id = $_SESSION['user_id'];
-
-        try {
-            // On récupère les informations nécessaires (ID du passager, détails du trajet)
-            // pour vérifier les droits ET pour créer la notification
-            $sql = "SELECT r.utilisateur_id, c.chauffeur_id, c.depart, c.arrivee
-                    FROM reservations r
-                    JOIN covoiturages c ON r.covoiturage_id = c.id
-                    WHERE r.id = ? AND c.chauffeur_id = ?";
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute([$reservation_id, $chauffeur_id]);
-            $reservation_data = $stmt->fetch();
-
-
-            // Si la réservation n'existe pas ou n'appartient pas au chauffeur, on arrête
-            if (!$reservation_data) {
-                return;
-            }
-
-            // On met à jour le statut de la réservation
-            $update = $pdo->prepare("UPDATE reservations SET statut = ? WHERE id = ?");
-            $update->execute([$statut, $reservation_id]);
-
-            // CRÉATION DE LA NOTIFICATION ---
-            // Si le chauffeur a confirmé (et non refusé), on crée une notification pour le passager
-            if ($statut === 'confirmée') {
-                $message = "Bonne nouvelle ! Votre réservation pour le trajet de " .
-                    htmlspecialchars($reservation_data['depart']) . " à " .
-                    htmlspecialchars($reservation_data['arrivee']) . " a été confirmée.";
-
-                // On appelle la méthode que nous avions créée dans UserController
-                UserController::createNotification($pdo, $reservation_data['utilisateur_id'], $message);
-            }
-            // Si le statut est 'refusée', on pourrait aussi créer une notification de refus ici.
-
-        } catch (PDOException $e) {
-            error_log("Erreur lors de la confirmation de réservation : " . $e->getMessage());
-        }
-    }
-
-    public static function startTrajet(PDO $pdo, int $trajet_id)
-    { // Permet à un chauffeur de démarrer son covoiturage.
         header('Content-Type: application/json');
 
-        // Sécurité : Vérifier si l'utilisateur est connecté
+        try {
+            $pdo->beginTransaction();
+
+            // 1. Instancier les modèles
+            $trajetModel = new TrajetModel($pdo);
+            $userModel = new UserModel($pdo);
+            $reservationModel = new ReservationModel($pdo);
+
+            // 2. Logique métier : Vérifications
+            if ($reservationModel->hasActiveReservation($userId, $trajetId)) {
+                throw new \Exception('Vous êtes déjà inscrit à ce trajet.');
+            }
+
+            $trajet = $trajetModel->findByIdForUpdate($trajetId);
+            if (!$trajet) {
+                throw new \Exception('Trajet non trouvé.');
+            }
+            if ($trajet['places_disponibles'] <= 0) {
+                throw new \Exception('Plus de places disponibles.');
+            }
+            if ($trajet['chauffeur_id'] == $userId) {
+                throw new \Exception('Vous ne pouvez pas réserver votre propre trajet.');
+            }
+            if ($trajet['statut'] !== 'planifié') {
+                throw new \Exception('Ce trajet n\'est plus ouvert aux réservations.');
+            }
+
+            $creditsPassager = $userModel->getCreditsForUpdate($userId);
+            if ($creditsPassager === false || $creditsPassager < $trajet['prix']) {
+                throw new \Exception('Crédits insuffisants.');
+            }
+
+            // 3. Exécution via les modèles
+            $userModel->debitCredits($userId, $trajet['prix']);
+            $trajetModel->decrementPlaces($trajetId);
+            $reservationModel->create($userId, $trajetId, 'en_attente'); // Statut US 8
+
+            // 4. Commit et réponse
+            $pdo->commit();
+            echo json_encode(['success' => true, 'message' => 'Réservation effectuée ! Elle est en attente de confirmation par le chauffeur.']);
+        } catch (\Exception $e) {
+            // 5. Gestion des erreurs
+            $pdo->rollBack();
+            error_log("Erreur participerTrajet : " . $e->getMessage());
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        exit();
+    }
+
+    /**
+     * Gère la confirmation/refus d'une réservation par un chauffeur
+     */
+    public static function confirmerReservation(PDO $pdo, int $reservationId, string $statut)
+    {
+        if (!isset($_SESSION['user_id']) || !in_array($statut, ['confirmée', 'refusée'])) {
+            $_SESSION['message'] = ['type' => 'danger', 'text' => 'Action invalide.'];
+            header('Location: /profile');
+            exit;
+        }
+        $chauffeurId = $_SESSION['user_id'];
+
+        try {
+            // 1. Instancier les modèles
+            $reservationModel = new ReservationModel($pdo);
+            $userModel = new UserModel($pdo);
+
+            // 2. Logique métier : Vérifier les droits
+            $reservationData = $reservationModel->findReservationForChauffeur($reservationId, $chauffeurId);
+            if (!$reservationData) {
+                throw new \Exception('Réservation non trouvée ou vous n\'êtes pas le chauffeur de ce trajet.');
+            }
+
+            // 3. Exécution via les modèles
+            $reservationModel->updateStatus($reservationId, $statut);
+
+            // 4. Logique métier : Notifier le passager
+            $message = "";
+            if ($statut === 'confirmée') {
+                $message = "Bonne nouvelle ! Votre réservation pour le trajet de " . htmlspecialchars($reservationData['depart']) . " à " . htmlspecialchars($reservationData['arrivee']) . " a été confirmée.";
+            } else if ($statut === 'refusée') {
+                $message = "Désolé, votre réservation pour le trajet de " . htmlspecialchars($reservationData['depart']) . " à " . htmlspecialchars($reservationData['arrivee']) . " a été refusée par le chauffeur.";
+                // TODO: Logique de remboursement si l'argent a été pris à la réservation
+            }
+
+            if ($message) {
+                $userModel->createNotification($reservationData['utilisateur_id'], $message);
+            }
+
+            $_SESSION['message'] = ['type' => 'success', 'text' => 'La réservation a bien été traitée.'];
+        } catch (\Exception $e) {
+            error_log("Erreur confirmerReservation : " . $e->getMessage());
+            $_SESSION['message'] = ['type' => 'danger', 'text' => $e->getMessage()];
+        }
+
+        header('Location: /profile');
+        exit();
+    }
+
+    /**
+     * Gère le démarrage d'un trajet (US 11)
+     */
+    public static function startTrajet(PDO $pdo, int $trajetId)
+    {
+        header('Content-Type: application/json');
         if (!isset($_SESSION['user_id'])) {
             echo json_encode(['success' => false, 'message' => 'Vous devez être connecté.']);
             exit;
@@ -302,37 +256,34 @@ class TrajetController
         $userId = $_SESSION['user_id'];
 
         try {
-            // Sécurité : Vérifier si l'utilisateur est bien le chauffeur de ce trajet
-            $stmt = $pdo->prepare("SELECT chauffeur_id FROM covoiturages WHERE id = ?");
-            $stmt->execute([$trajet_id]);
-            $chauffeur_id_db = $stmt->fetchColumn();
+            $trajetModel = new TrajetModel($pdo);
 
-            if ($chauffeur_id_db != $userId) {
-                echo json_encode(['success' => false, 'message' => 'Action non autorisée.']);
-                exit;
+            // 1. Vérifier le propriétaire (on pourrait le faire dans le modèle, mais c'est une règle métier)
+            $trajet = $trajetModel->findByIdForUpdate($trajetId); // FOR UPDATE pour la transaction
+            if (!$trajet || $trajet['chauffeur_id'] != $userId) {
+                throw new \Exception('Action non autorisée.');
             }
 
-            // Mettre à jour le statut du covoiturage
-            $updateStmt = $pdo->prepare("UPDATE covoiturages SET statut = 'en_cours' WHERE id = ? AND statut = 'planifié'");
-            $updateStmt->execute([$trajet_id]);
-            // Si la mise à jour a réussi, on renvoie un message de succès
-            // Sinon, on renvoie un message d'erreur
-            if ($updateStmt->rowCount() > 0) {
-                echo json_encode(['success' => true, 'message' => 'Trajet démarré avec succès.']);
-            } else {
-                echo json_encode(['success' => false, 'message' => 'Le trajet n\'a pas pu être démarré (il est peut-être déjà en cours ou terminé).']);
+            // 2. Exécuter la mise à jour
+            $rowsAffected = $trajetModel->updateStatusConditional($trajetId, 'en_cours', 'planifié');
+            if ($rowsAffected == 0) {
+                throw new \Exception('Le trajet n\'a pas pu être démarré (il est peut-être déjà en cours ou terminé).');
             }
-        } catch (PDOException $e) {
+
+            echo json_encode(['success' => true, 'message' => 'Trajet démarré avec succès.']);
+        } catch (\Exception $e) {
             error_log("Erreur dans startTrajet : " . $e->getMessage());
-            echo json_encode(['success' => false, 'message' => 'Erreur serveur.']);
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
+        exit();
     }
 
-    public static function endTrajet(PDO $pdo, int $trajet_id)
-    { // Permet à un chauffeur de terminer son covoiturage et notifie les passagers.
+    /**
+     * Gère la fin d'un trajet (US 11)
+     */
+    public static function endTrajet(PDO $pdo, int $trajetId)
+    {
         header('Content-Type: application/json');
-
-        // Sécurité : Vérifier la connexion et le rôle de l'utilisateur
         if (!isset($_SESSION['user_id'])) {
             echo json_encode(['success' => false, 'message' => 'Vous devez être connecté.']);
             exit;
@@ -342,86 +293,55 @@ class TrajetController
         try {
             $pdo->beginTransaction();
 
-            // Sécurité : Vérifier si l'utilisateur est bien le chauffeur du trajet
-            $stmt = $pdo->prepare("SELECT chauffeur_id FROM covoiturages WHERE id = ?");
-            $stmt->execute([$trajet_id]);
-            $chauffeur_id_db = $stmt->fetchColumn();
+            $trajetModel = new TrajetModel($pdo);
+            $reservationModel = new ReservationModel($pdo);
+            $userModel = new UserModel($pdo);
 
-            if ($chauffeur_id_db != $userId) {
-                $pdo->rollBack();
-                echo json_encode(['success' => false, 'message' => 'Action non autorisée.']);
-                exit;
+            // 1. Vérifier le propriétaire
+            $trajet = $trajetModel->findByIdForUpdate($trajetId);
+            if (!$trajet || $trajet['chauffeur_id'] != $userId) {
+                throw new \Exception('Action non autorisée.');
             }
 
-            // Mettre à jour le statut du covoiturage à 'terminé'
-            $updateStmt = $pdo->prepare("UPDATE covoiturages SET statut = 'terminé' WHERE id = ? AND statut = 'en_cours'");
-            $updateStmt->execute([$trajet_id]);
-
-            if ($updateStmt->rowCount() == 0) {
-                $pdo->rollBack();
-                echo json_encode(['success' => false, 'message' => 'Le trajet n\'a pas pu être terminé (il n\'était pas en cours).']);
-                exit;
+            // 2. Mettre à jour le statut du trajet
+            $rowsAffected = $trajetModel->updateStatusConditional($trajetId, 'terminé', 'en_cours');
+            if ($rowsAffected == 0) {
+                throw new \Exception('Le trajet n\'a pas pu être terminé (il n\'était pas en cours).');
             }
 
-            // Récupérer les emails et pseudos des passagers pour les notifier
-            $stmtPassagers = $pdo->prepare("
-                SELECT u.email, u.pseudo FROM reservations r
-                JOIN utilisateurs u ON r.utilisateur_id = u.id
-                WHERE r.covoiturage_id = ?
-            ");
-            $stmtPassagers->execute([$trajet_id]);
-            $passagers = $stmtPassagers->fetchAll();
+            // 3. Notifier les passagers (Email + Notification interne)
+            $passagers = $reservationModel->getConfirmedPassagers($trajetId);
+            $message = "Votre trajet de " . htmlspecialchars($trajet['depart']) . " à " . htmlspecialchars($trajet['arrivee']) . " est terminé. N'oubliez pas de le valider sur votre profil !";
 
-            // Envoi des e-mails
             foreach ($passagers as $passager) {
+                // Notification interne
+                $userModel->createNotification($passager['utilisateur_id'], $message);
 
-                // Envoyer un email de notification
-                // On simule l'envoi en écrivant dans les logs au lieu d'envoyer un vrai email
-                error_log("SIMULATION: E-mail de fin de trajet envoyé à " . $passager['email']);
-
-                /*bloc d'envoi d'email (absence d'un serveur SMTP fonctionnel en environnement de développement local)
-                $mail = new PHPMailer(true);
-                try {
-                    // Configuration du serveur SMTP (à mettre dans votre fichier .env)
-                    $mail->isSMTP();
-                    $mail->Host       = $_ENV['MAIL_HOST'];
-                    $mail->SMTPAuth   = true;
-                    $mail->Username   = $_ENV['MAIL_USERNAME'];
-                    $mail->Password   = $_ENV['MAIL_PASSWORD'];
-                    $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-                    $mail->Port       = $_ENV['MAIL_PORT'];
-
-                    // Destinataires et expéditeur
-                    $mail->setFrom('no-reply@ecoride.fr', 'EcoRide');
-                    $mail->addAddress($passager['email'], $passager['pseudo']);
-
-                    // Contenu de l'e-mail
-                    $mail->isHTML(true);
-                    $mail->Subject = 'Votre trajet EcoRide est terminé !';
-                    $mail->Body    = 'Bonjour ' . htmlspecialchars($passager['pseudo']) . ',<br><br>Votre trajet est maintenant terminé. Merci de vous rendre sur votre profil pour valider que tout s\'est bien passé et laisser un avis à votre chauffeur.<br><br><a href="http://' . $_SERVER['HTTP_HOST'] . '/profile">Accéder à mon profil</a><br><br>L\'équipe EcoRide';
-                    $mail->AltBody = 'Bonjour ' . htmlspecialchars($passager['pseudo']) . ', Votre trajet est maintenant terminé. Merci de vous rendre sur votre profil pour valider que tout s\'est bien passé et laisser un avis à votre chauffeur. Lien : http://' . $_SERVER['HTTP_HOST'] . '/profile';
-
-                    $mail->send();
-                } catch (Exception $e) {
-                    // Ne pas bloquer le processus si un email échoue, mais l'enregistrer
-                    error_log("PHPMailer n'a pas pu envoyer l'email à " . $passager['email'] . ". Erreur: {$mail->ErrorInfo}");
-                }
-                    */
+                // Envoi d'email (simulé)
+                self::sendSimulationEmail(
+                    $passager['email'],
+                    $passager['pseudo'],
+                    'Votre trajet EcoRide est terminé !',
+                    $message
+                );
             }
 
             $pdo->commit();
             echo json_encode(['success' => true, 'message' => 'Trajet terminé. Les passagers ont été notifiés.']);
-        } catch (PDOException $e) {
+        } catch (\Exception $e) {
             $pdo->rollBack();
             error_log("Erreur dans endTrajet : " . $e->getMessage());
-            echo json_encode(['success' => false, 'message' => 'Erreur serveur.']);
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
+        exit();
     }
 
-    public static function cancelReservation(PDO $pdo, int $reservation_id)
-    { // Permet à un passager d'annuler sa propre réservation et de récupérer ses crédits.
+    /**
+     * Gère l'annulation d'une réservation par le passager
+     */
+    public static function cancelReservation(PDO $pdo, int $reservationId)
+    {
         header('Content-Type: application/json');
-
         if (!isset($_SESSION['user_id'])) {
             echo json_encode(['success' => false, 'message' => 'Vous devez être connecté.']);
             exit;
@@ -431,130 +351,133 @@ class TrajetController
         try {
             $pdo->beginTransaction();
 
-            // Vérifier que la réservation appartient à l'utilisateur et que le trajet est annulable
-            $stmt = $pdo->prepare("
-                SELECT r.covoiturage_id, c.prix, c.statut AS trajet_statut 
-                FROM reservations r
-                JOIN covoiturages c ON r.covoiturage_id = c.id
-                WHERE r.id = ? AND r.utilisateur_id = ? AND r.statut = 'confirmée'
-            ");
-            $stmt->execute([$reservation_id, $passagerId]);
-            $reservation = $stmt->fetch();
+            // 1. Instancier les modèles
+            $reservationModel = new ReservationModel($pdo);
+            $trajetModel = new TrajetModel($pdo);
+            $userModel = new UserModel($pdo);
 
-            if (!$reservation || $reservation['trajet_statut'] !== 'planifié') {
-                $pdo->rollBack();
-                echo json_encode(['success' => false, 'message' => 'Annulation impossible. Le trajet a peut-être déjà commencé.']);
-                exit;
+            // 2. Logique métier : Vérifier les droits
+            $reservation = $reservationModel->findReservationForPassager($reservationId, $passagerId);
+            if (!$reservation) {
+                throw new \Exception('Réservation non trouvée ou déjà annulée/terminée.');
+            }
+            if ($reservation['trajet_statut'] !== 'planifié') {
+                throw new \Exception('Annulation impossible. Le trajet a peut-être déjà commencé.');
             }
 
-            // 1. Mettre à jour le statut de la réservation à 'annulée'
-            $stmtUpdateRes = $pdo->prepare("UPDATE reservations SET statut = 'annulée' WHERE id = ?");
-            $stmtUpdateRes->execute([$reservation_id]);
+            // 3. Exécution via les modèles
+            $reservationModel->updateStatus($reservationId, 'annulée');
+            $userModel->creditCredits($passagerId, $reservation['prix']); // Rembourser
+            $trajetModel->incrementPlaces($reservation['covoiturage_id']); // Rajouter la place
 
-            // 2. Rembourser les crédits au passager
-            $stmtRefund = $pdo->prepare("UPDATE utilisateurs SET credit = credit + ? WHERE id = ?");
-            $stmtRefund->execute([$reservation['prix'], $passagerId]);
-
-            // 3. Rajouter une place disponible dans le covoiturage
-            $stmtAddPlace = $pdo->prepare("UPDATE covoiturages SET places_disponibles = places_disponibles + 1 WHERE id = ?");
-            $stmtAddPlace->execute([$reservation['covoiturage_id']]);
-
+            // 4. Commit et réponse
             $pdo->commit();
             echo json_encode(['success' => true, 'message' => 'Votre réservation a été annulée et vos crédits vous ont été remboursés.']);
-        } catch (PDOException $e) {
+        } catch (\Exception $e) {
             $pdo->rollBack();
             error_log("Erreur dans cancelReservation : " . $e->getMessage());
-            echo json_encode(['success' => false, 'message' => 'Erreur serveur lors de l\'annulation.']);
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
+        exit();
     }
 
-    public static function cancelTrajet(PDO $pdo, int $trajet_id)
-    { // Permet à un chauffeur d'annuler un de ses trajets et de rembourser les passagers.
+    /**
+     * Gère l'annulation d'un trajet par le chauffeur
+     */
+    public static function cancelTrajet(PDO $pdo, int $trajetId)
+    {
         header('Content-Type: application/json');
-
-        if (!isset($_SESSION['user_id'])) { /* ... */
+        if (!isset($_SESSION['user_id'])) {
+            echo json_encode(['success' => false, 'message' => 'Vous devez être connecté.']);
+            exit;
         }
         $chauffeurId = $_SESSION['user_id'];
 
         try {
             $pdo->beginTransaction();
 
-            // Vérifier que le trajet appartient au chauffeur et est annulable
-            $stmt = $pdo->prepare("SELECT prix, statut, depart, arrivee FROM covoiturages WHERE id = ? AND chauffeur_id = ?");
-            $stmt->execute([$trajet_id, $chauffeurId]);
-            $trajet = $stmt->fetch();
+            // 1. Instancier les modèles
+            $trajetModel = new TrajetModel($pdo);
+            $reservationModel = new ReservationModel($pdo);
+            $userModel = new UserModel($pdo);
 
-            if (!$trajet || $trajet['statut'] !== 'planifié') {
-                $pdo->rollBack();
-                echo json_encode(['success' => false, 'message' => 'Annulation impossible.']);
-                exit;
+            // 2. Logique métier : Vérifier les droits
+            $trajet = $trajetModel->findByIdForUpdate($trajetId);
+            if (!$trajet || $trajet['chauffeur_id'] != $chauffeurId) {
+                throw new \Exception('Action non autorisée.');
+            }
+            if ($trajet['statut'] !== 'planifié') {
+                throw new \Exception('Annulation impossible (trajet non planifié).');
             }
 
-            // 1. Mettre à jour le statut du covoiturage à 'annulé'
-            $stmtUpdateTrajet = $pdo->prepare("UPDATE covoiturages SET statut = 'annulé' WHERE id = ?");
-            $stmtUpdateTrajet->execute([$trajet_id]);
+            // 3. Mettre à jour le statut du trajet
+            $trajetModel->updateStatus($trajetId, 'annulé');
 
-            // 2. Récupérer tous les passagers ayant une réservation confirmée pour ce trajet
-            $stmtPassagers = $pdo->prepare("
-                SELECT r.id, r.utilisateur_id, u.email, u.pseudo 
-                FROM reservations r
-                JOIN utilisateurs u ON r.utilisateur_id = u.id
-                WHERE r.covoiturage_id = ? AND r.statut = 'confirmée'
-            ");
-            $stmtPassagers->execute([$trajet_id]);
-            $passagers = $stmtPassagers->fetchAll();
+            // 4. Gérer les passagers (Remboursement + Notification)
+            $passagers = $reservationModel->getConfirmedPassagers($trajetId);
+            $message = "Le trajet de " . htmlspecialchars($trajet['depart']) . " à " . htmlspecialchars($trajet['arrivee']) . " a été annulé par le chauffeur. Vos crédits ont été remboursés.";
 
-            // 3. Pour chaque passager, annuler sa réservation et le rembourser
             foreach ($passagers as $passager) {
-                // Rembourser le passager
-                $stmtRefund = $pdo->prepare("UPDATE utilisateurs SET credit = credit + ? WHERE id = ?");
-                $stmtRefund->execute([$trajet['prix'], $passager['utilisateur_id']]);
+                $userModel->creditCredits($passager['utilisateur_id'], $trajet['prix']); // Rembourser
+                $reservationModel->updateStatus($passager['id'], 'annulée'); // Annuler leur réservation
+                $userModel->createNotification($passager['utilisateur_id'], $message); // Notifier
 
-                // Mettre à jour sa réservation
-                $stmtUpdateRes = $pdo->prepare("UPDATE reservations SET statut = 'annulée' WHERE id = ?");
-                $stmtUpdateRes->execute([$passager['id']]);
-
-                // On crée la notification dans la base de données
-                $message = "Le trajet de " . htmlspecialchars($trajet['depart']) . " à " . htmlspecialchars($trajet['arrivee']) . " a été annulé par le chauffeur.";
-                UserController::createNotification($pdo, $passager['utilisateur_id'], $message);
-
-                // Envoyer un email de notification
-                // On simule l'envoi en écrivant dans les logs au lieu d'envoyer un vrai email
-                error_log("SIMULATION: E-mail d'annulation envoyé à " . $passager['email']);
-
-                /*bloc d'envoi d'email (absence d'un serveur SMTP fonctionnel en environnement de développement local)
-                $mail = new PHPMailer(true);
-                try {
-
-                    // Configuration du serveur SMTP
-                    $mail->isSMTP();
-                    $mail->Host       = $_ENV['MAIL_HOST'];
-                    $mail->SMTPAuth   = true;
-                    $mail->Username   = $_ENV['MAIL_USERNAME'];
-                    $mail->Password   = $_ENV['MAIL_PASSWORD'];
-                    $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-                    $mail->Port       = $_ENV['MAIL_PORT'];
-
-                    // Destinataires et expéditeur
-                    $mail->setFrom('no-reply@ecoride.fr', 'EcoRide');
-                    $mail->addAddress($passager['email'], $passager['pseudo']);
-
-                    // Contenu de l'e-mail
-                    $mail->Subject = 'Annulation de votre trajet EcoRide';
-                    $mail->Body    = 'Bonjour ' . htmlspecialchars($passager['pseudo']) . ',<br><br>Nous sommes au regret de vous informer que votre trajet a été annulé par le chauffeur. Vos crédits vous ont été intégralement remboursés.';
-                    $mail->send();
-                } catch (Exception $e) {
-                    error_log("PHPMailer n'a pas pu envoyer l'email d'annulation à " . $passager['email'] . ". Erreur: {$mail->ErrorInfo}");
-                }
-                    */
+                // Envoyer email (simulation)
+                self::sendSimulationEmail(
+                    $passager['email'],
+                    $passager['pseudo'],
+                    'Annulation de votre trajet EcoRide',
+                    $message
+                );
             }
 
+            // 5. Commit et réponse
             $pdo->commit();
             echo json_encode(['success' => true, 'message' => 'Le trajet a été annulé. Les passagers ont été notifiés et remboursés.']);
-        } catch (PDOException $e) {
+        } catch (\Exception $e) {
             $pdo->rollBack();
             error_log("Erreur dans cancelTrajet : " . $e->getMessage());
-            echo json_encode(['success' => false, 'message' => 'Erreur serveur lors de l\'annulation du trajet.']);
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
+        exit();
+    }
+
+    /**
+     * Simule l'envoi d'un email en écrivant dans les logs
+     * (Remplace le bloc PHPMailer pour la propreté)
+     */
+    private static function sendSimulationEmail(string $email, string $pseudo, string $sujet, string $corps)
+    {
+        // Bloc PHPMailer original ici, mais commenté
+        error_log("SIMULATION EMAIL: \n Destinataire: $email ($pseudo) \n Sujet: $sujet \n Corps: $corps\n");
+
+        /*
+        $mail = new PHPMailer(true);
+        try {
+            // Configuration du serveur SMTP (à mettre dans votre fichier .env)
+            $mail->isSMTP();
+            $mail->Host       = $_ENV['MAIL_HOST'];
+            $mail->SMTPAuth   = true;
+            $mail->Username   = $_ENV['MAIL_USERNAME'];
+            $mail->Password   = $_ENV['MAIL_PASSWORD'];
+            $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+            $mail->Port       = $_ENV['MAIL_PORT'];
+
+            // Destinataires et expéditeur
+            $mail->setFrom('no-reply@ecoride.fr', 'EcoRide');
+            $mail->addAddress($email, $pseudo);
+
+            // Contenu de l'e-mail
+            $mail->isHTML(true);
+            $mail->Subject = $sujet;
+            $mail->Body    = 'Bonjour ' . htmlspecialchars($pseudo) . ',<br><br>' . $corps;
+            $mail->AltBody = 'Bonjour ' . htmlspecialchars($pseudo) . ', ' . strip_tags($corps);
+
+            $mail->send();
+        } catch (Exception $e) {
+            // Ne pas bloquer le processus si un email échoue, mais l'enregistrer
+            error_log("PHPMailer n'a pas pu envoyer l'email à " . $email . ". Erreur: {$mail->ErrorInfo}");
+        }
+        */
     }
 }
