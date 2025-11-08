@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Controllers; // <-- Assurez-vous que le namespace est Controllers
+namespace App\Controllers;
 
 use PDO;
 use PDOException;
@@ -10,7 +10,7 @@ use App\Models\ReservationModel;
 use App\Models\IncidentModel;
 use App\Models\UserModel;
 
-class AvisController // <-- Le nom de la classe doit correspondre au fichier
+class AvisController
 {
     /**
      * Permet à un passager de valider un trajet terminé, de laisser un avis,
