@@ -36,6 +36,14 @@ class AuthController
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['user_role'] = $user['role'];
 
+                // 1. On vérifie si une redirection spécifique a été demandée
+                if (!empty($postData['redirect'])) {
+                    // On redirige vers l'URL de recherche sauvegardée
+                    // (urldecode n'est pas strictement nécessaire car le navigateur gère, mais c'est propre)
+                    header("Location: " . $postData['redirect']);
+                    exit;
+                }
+                // 2. Redirection basée sur le rôle
                 switch ($user['role']) {
                     case 'admin':
                         header("Location: /admin");
