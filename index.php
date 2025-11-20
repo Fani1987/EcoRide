@@ -28,6 +28,8 @@ use App\Controllers\AdminController;
 use App\Controllers\EmployeeController;
 use App\Controllers\AvisController;
 use App\Controllers\PaymentController;
+use App\Controllers\ContactController;
+use App\Controllers\VehicleController;
 
 // 4. Chargement de la configuration sécurisée (.env)
 // On utilise la librairie vlucas/phpdotenv pour charger les variables d'environnement
@@ -95,9 +97,9 @@ switch ($path) {
         break;
 
     case '/contact':
-        // Page de contact (GET = Afficher, POST = Traiter l'envoi)
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            UserController::handleContactForm($_POST);
+            // On appelle le NOUVEAU contrôleur
+            ContactController::handleContactForm($_POST);
         } else {
             renderView('contact');
         }
@@ -175,9 +177,13 @@ switch ($path) {
         break;
 
     case '/api/updateVehicle':
-        // Ajout ou modification de véhicule
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            UserController::updateVehicle($pdo, $_SESSION['user_id'] ?? 0, $_POST);
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SESSION['user_id'])) {
+            // On appelle le NOUVEAU contrôleur
+            VehicleController::updateVehicle($pdo, $_SESSION['user_id'], $_POST);
+        } else {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Requête invalide ou non autorisée.']);
+            http_response_code(400);
         }
         break;
 
