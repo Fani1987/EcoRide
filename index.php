@@ -371,6 +371,11 @@ switch ($path) {
         }
         break;
 
+    case '/api/keep_alive':
+        // On appelle la méthode pour activer MongoDB
+        UserController::ping();
+        break;
+
     default:
         http_response_code(404);
         renderView('404');

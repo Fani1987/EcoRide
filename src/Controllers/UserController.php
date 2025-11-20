@@ -354,4 +354,25 @@ class UserController
         header('Location: /contact');
         exit;
     }
+
+    /**
+     * Fonction simple pour réveiller MongoDB (utilisée par le Cron Job)
+     */
+    public static function ping()
+    {
+        header('Content-Type: application/json');
+        try {
+            // On utilise votre classe Database existante pour récupérer la connexion
+            $client = Database::getMongoClient();
+
+            // On fait une opération légère (lister les bases) pour forcer le réveil
+            $client->listDatabases();
+
+            echo json_encode(['status' => 'success', 'message' => 'MongoDB est réveillé !']);
+        } catch (\Exception $e) {
+            // Même si ça échoue, le fait d'avoir essayé a probablement réveillé le service
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit();
+    }
 }
