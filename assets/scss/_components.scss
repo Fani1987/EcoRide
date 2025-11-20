@@ -1,0 +1,96 @@
+.card {
+  background-color: $primary;
+  border: 1px solid $black;
+}
+
+.card-header {
+  background-color: $dark;
+  color: $white;
+}
+
+.card-body {
+  background-color: $primary;
+  color: $black;
+}
+
+.list-group-item {
+  background-color: $primary;
+  color: $black;
+  border: 1px solid $dark;
+}
+
+form {
+  max-width: 600px;
+  margin: auto;
+}
+
+.form {
+  width: 100%;
+  padding: 0.5rem;
+  border-radius: 5px;
+  border: 1px solid $dark;
+}
+
+label {
+  font-weight: bold;
+  margin-bottom: 0.3rem;
+  display: inline-block;
+}
+
+form label {
+  display: block;
+  text-align: left;
+  margin-bottom: 0.5rem;
+  font-weight: bold;
+}
+
+form .form {
+  width: 100%;
+  padding: 0.5rem;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+  margin-bottom: 1rem;
+}
+
+.TextForm,
+.Date {
+  margin-top: 1rem;
+}
+
+.marginNotice {
+  margin-bottom: 70px;
+}
+
+.mentionsTitre {
+  border-bottom: 1px solid var(--bg-Dark, #2a5b3f);
+}
+
+.text-justify {
+  text-align: justify;
+}
+
+/* Style simple pour la barre de filtres */
+.filtres {
+  margin-bottom: 20px;
+}
+
+.register {
+  width: 350px;
+  margin: 50px auto;
+}
+
+#successMessage {
+  display: none;
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background-color: $secondary;
+  color: $black;
+  padding: 15px;
+  border-radius: 5px;
+  z-index: 1000;
+}
+
+.filter-toggle {
+  display: none;
+}

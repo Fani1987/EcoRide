@@ -61,7 +61,7 @@
           <div class="order-1 order-md-2 col-md-6">
             <img
               class="imgIllustration"
-              src="/assets/Images/Environment.jpg"
+              src="/assets/images/Environment.jpg"
               alt="Notre mission" />
           </div>
         </div>
