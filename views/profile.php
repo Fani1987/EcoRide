@@ -145,8 +145,11 @@
         <?php // Affiche les réservations en attente de confirmation pour le chauffeur propriétaire. 
         ?>
         <?php if ($isOwner && $user['est_chauffeur']): ?>
+
           <div class="card border-dark mb-4">
+
             <div class="card-header bg-dark text-white">Réservations en attente</div>
+
             <div class="card-body bg-primary">
               <?php if (!empty($reservationsEnAttente)): ?>
                 <ul class="list-group">
@@ -155,7 +158,7 @@
                       <strong><?= htmlspecialchars($reservation['passager_pseudo']) ?></strong> a réservé le trajet
                       <?= htmlspecialchars($reservation['depart']) ?> → <?= htmlspecialchars($reservation['arrivee']) ?>
                       (<?= date('d M Y H:i', strtotime($reservation['date_depart'])) ?>)
-                      <form action="/confirmer-reservation" method="POST" class="mt-2 d-flex gap-2">
+                      <form action="/api/confirmReservation" method="POST" class="mt-2 d-flex gap-2">
                         <input type="hidden" name="reservation_id" value="<?= $reservation['id'] ?>">
                         <select name="statut" class="form-select w-auto">
                           <option value="confirmée">Confirmer</option>
@@ -166,10 +169,13 @@
                     </li>
                   <?php endforeach; ?>
                 </ul>
+
               <?php else: ?>
                 <div class="alert alert-info mb-0">Aucune réservation en attente.</div>
               <?php endif; ?>
+
             </div>
+
           </div>
         <?php endif; ?>
 
