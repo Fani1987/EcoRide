@@ -190,10 +190,15 @@ class ReservationModel
      */
     public function getPassagersByTrajet(int $trajetId)
     {
-        $sqlPassagers = "SELECT u.id, u.pseudo 
+        $sqlPassagers = "SELECT 
+                            u.id, 
+                            u.pseudo, 
+                            u.pseudo AS passager_pseudo, -- Alias pour profile.php
+                            r.statut                     
                          FROM reservations r 
                          JOIN utilisateurs u ON r.utilisateur_id = u.id 
                          WHERE r.covoiturage_id = ? AND r.statut IN ('confirmée', 'validée')";
+
         $stmtPassagers = $this->pdo->prepare($sqlPassagers);
         $stmtPassagers->execute([$trajetId]);
         return $stmtPassagers->fetchAll(PDO::FETCH_ASSOC);
