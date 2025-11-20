@@ -26,7 +26,7 @@
                 <a class="navbar-brand" href="/">
                     <div class="d-flex align-items-center">
                         <img
-                            src="/assets/images/EcoRide logo.jpeg"
+                            src="/assets/images/ecoride-logo.jpeg"
                             alt="Logo"
                             width="50"
                             height="50" />
