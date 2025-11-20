@@ -151,7 +151,7 @@
                         <a href="/profile?id=<?= htmlspecialchars($trajet['chauffeur_id']) ?>" class="btn btn-secondary">Profil Chauffeur</a>
 
                       <?php else: ?> <!-- Si l'utilisateur n'est pas connecté -->
-                        <a href="/login" class="btn btn-info">Connectez-vous pour réserver</a>
+                        <a href="/login?redirect=<?= urlencode($_SERVER['REQUEST_URI']) ?>" class="btn btn-info">Connectez-vous pour réserver</a>
                       <?php endif; ?>
                     </div>
                   </div>

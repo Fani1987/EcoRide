@@ -5,6 +5,11 @@
 
   <div class="bg-primary text-black register">
     <form method="post" action="/login">
+
+      <?php if (isset($_GET['redirect'])): ?>
+        <input type="hidden" name="redirect" value="<?= htmlspecialchars($_GET['redirect']) ?>">
+      <?php endif; ?>
+
       <section>
         <div>
           <label for="email">E-mail :</label>
@@ -44,7 +49,7 @@
 
       <section class="text-center">
         <div>
-          <a href="/register">Nouveau venu? Créez votre compte en 2 min</a>
+          <a href="/register<?= isset($_GET['redirect']) ? '?redirect=' . urlencode($_GET['redirect']) : '' ?>">Nouveau venu? Créez votre compte en 2 min</a>
         </div>
       </section>
     </form>
