@@ -2,110 +2,384 @@
 
 namespace App\Controllers;
 
+// Imports des classes nécessaires
 use PDO;
-use PDOException;
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
+use Exception;
 
-// On importe TOUS les modèles dont on a besoin
+// On importe notre nouveau Service d'Email (pour ne plus polluer le contrôleur)
+use App\Services\MailerService;
+
+// On importe les Modèles (MVC) pour interagir avec la BDD
 use App\Models\TrajetModel;
 use App\Models\ReservationModel;
 use App\Models\UserModel;
 use App\Models\AvisModel;
-use App\Controllers\UserController; // On le garde pour la logique MongoDB
+// On importe UserController uniquement pour accéder à la méthode MongoDB (préférences)
+use App\Controllers\UserController;
 
 class TrajetController
 {
     /**
-     * Gère la création d'un trajet (covoiturage).
-     * Le contrôleur gère la validation, la session, et la transaction.
+     * Gère la publication d'un nouveau trajet par un chauffeur.
+     * Route : POST /api/ajouterTrajet
      */
     public static function ajouterTrajet(PDO $pdo, array $postData)
     {
+        // 1. Gardien de sécurité : L'utilisateur doit être connecté
         if (!isset($_SESSION['user_id'])) {
             header('Content-Type: application/json');
             echo json_encode(['success' => false, 'message' => 'Vous devez être connecté.']);
             exit();
         }
         $userId = $_SESSION['user_id'];
-        $costToAddTrajet = 2; // Coût fixe de 2 crédits
+        $costToAddTrajet = 2; // Coût en crédits pour publier une annonce
 
-        // 1. Validation des données
+        // 2. Validation des champs obligatoires
         $requiredFields = ['depart', 'arrivee', 'date_depart', 'prix', 'places_disponibles', 'vehicule_id'];
         foreach ($requiredFields as $field) {
             if (empty($postData[$field])) {
                 header('Content-Type: application/json');
-                echo json_encode(['success' => false, 'message' => 'Tous les champs sont requis.']);
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => "Le champ $field est requis."]);
                 exit();
             }
         }
 
         try {
-            // 2. Démarrer la transaction
+            // 3. DÉBUT DE LA TRANSACTION (ACID)
+            // On doit débiter l'utilisateur ET créer le trajet. Tout ou rien.
             $pdo->beginTransaction();
 
-            // 3. Instancier les modèles
             $userModel = new UserModel($pdo);
+
+            // On verrouille la ligne de l'utilisateur pour éviter qu'il dépense ses crédits ailleurs en même temps
+            $credits = $userModel->getCreditsForUpdate($userId);
+
+            if ($credits < $costToAddTrajet) {
+                // Pas assez de crédits ? On annule tout.
+                $pdo->rollBack();
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'message' => 'Crédits insuffisants (2 crédits requis).']);
+                exit();
+            }
+
+            // 4. Exécution des modifications
             $trajetModel = new TrajetModel($pdo);
+            $estEcologique = isset($postData['est_ecologique']) ? 1 : 0;
 
-            // 4. Logique métier : Vérifier et déduire les crédits
-            $currentCredits = $userModel->getCreditsForUpdate($userId); // FOR UPDATE verrouille la ligne
-            if ($currentCredits === false || $currentCredits < $costToAddTrajet) {
-                throw new \Exception('Crédits insuffisants pour ajouter un trajet.');
-            }
+            // a. Débit des crédits
+            $userModel->debitCredits($userId, $costToAddTrajet);
 
-            if (!$userModel->debitCredits($userId, $costToAddTrajet)) {
-                throw new \Exception('La mise à jour des crédits a échoué.');
-            }
-
-            // 5. Logique métier : Créer le trajet
-            $trajetCree = $trajetModel->create(
+            // b. Création du trajet en base
+            $trajetModel->create(
                 $userId,
                 (int)$postData['vehicule_id'],
-                ($postData['depart']),
-                ($postData['arrivee']),
-                ($postData['date_depart']),
+                $postData['depart'],
+                $postData['arrivee'],
+                $postData['date_depart'],
                 (float)$postData['prix'],
                 (int)$postData['places_disponibles'],
-                isset($postData['est_ecologique']) ? 1 : 0
+                $estEcologique
             );
 
-            if (!$trajetCree) {
-                throw new \Exception('La création du trajet a échoué.');
-            }
-
-            // 6. Valider la transaction
+            // 5. Validation finale
             $pdo->commit();
 
-            // 7. Réponse (Redirection)
-            $_SESSION['message'] = ['type' => 'success', 'text' => 'Trajet ajouté avec succès et ' . $costToAddTrajet . ' crédits déduits !'];
-            header('Location: /profile'); // Redirection vers le profil
-            exit();
-        } catch (\Exception $e) { // On "catch" \Exception pour tout attraper (PDOException et nos \Exception)
-            // 8. Gestion des erreurs
+            header('Content-Type: application/json');
+            echo json_encode(['success' => true, 'message' => 'Trajet publié avec succès !']);
+        } catch (Exception $e) {
+            // En cas d'erreur technique, on annule tout pour ne pas laisser la BDD incohérente
             $pdo->rollBack();
-            error_log("Erreur lors de l'ajout de trajet : " . $e->getMessage());
-
-            // On peut choisir de répondre en JSON (si c'est une API) ou de rediriger
-            $_SESSION['message'] = ['type' => 'danger', 'text' => $e->getMessage()];
-            header('Location: /profile'); // Redirection vers le profil avec un message d'erreur
-            exit();
+            error_log("Erreur ajouterTrajet : " . $e->getMessage());
+            header('Content-Type: application/json');
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => 'Erreur serveur.']);
         }
     }
 
     /**
-     * Affiche la page de détail d'un trajet
+     * Gère la réservation d'un trajet par un passager.
+     * C'est la transaction la plus critique du site.
+     * Route : POST /api/reserverTrajet
+     */
+    public static function participerTrajet(PDO $pdo, int $trajetId, int $passagerId)
+    {
+        header('Content-Type: application/json');
+        $coutReservation = 2; // Frais de réservation
+
+        try {
+            // 1. DÉBUT DE LA TRANSACTION
+            $pdo->beginTransaction();
+
+            // 2. Vérifications Préalables (Lecture)
+            $reservationModel = new ReservationModel($pdo);
+            if ($reservationModel->hasActiveReservation($passagerId, $trajetId)) {
+                throw new Exception('Vous avez déjà réservé ce trajet.');
+            }
+
+            $trajetModel = new TrajetModel($pdo);
+            // Important : On verrouille le trajet (FOR UPDATE) pour éviter qu'une autre personne
+            // ne prenne la dernière place pendant qu'on fait les vérifications.
+            $trajet = $trajetModel->findByIdForUpdate($trajetId);
+
+            if (!$trajet) throw new Exception('Trajet introuvable.');
+            if ($trajet['places_disponibles'] <= 0) throw new Exception('Plus de places disponibles.');
+            if ($trajet['chauffeur_id'] == $passagerId) throw new Exception('Vous ne pouvez pas réserver votre propre trajet.');
+            if ($trajet['statut'] !== 'planifié') throw new Exception('Ce trajet n\'est plus disponible.');
+
+            // 3. Vérification des crédits
+            $userModel = new UserModel($pdo);
+            $credits = $userModel->getCreditsForUpdate($passagerId);
+
+            if ($credits < $coutReservation) throw new Exception('Crédits insuffisants pour réserver.');
+
+            // 4. Exécution des modifications (Écriture)
+
+            // a. Débit du passager
+            $userModel->debitCredits($passagerId, $coutReservation);
+
+            // b. Décrémentation des places disponibles
+            $trajetModel->decrementPlaces($trajetId);
+
+            // c. Création de la réservation
+            $reservationModel->create($passagerId, $trajetId, 'en_attente');
+
+            // 5. Validation finale
+            $pdo->commit();
+
+            // 6. Notification (Hors Transaction)
+            // On utilise notre Service Mailer pour garder le contrôleur propre.
+            // (Dans une version avancée, on récupérerait l'email du chauffeur ici)
+            MailerService::send(
+                'chauffeur@test.com', // Simulation : email du chauffeur
+                'Chauffeur',
+                'Nouvelle réservation',
+                "Un passager a réservé votre trajet. Connectez-vous pour confirmer."
+            );
+
+            echo json_encode(['success' => true, 'message' => 'Réservation effectuée. En attente de validation du chauffeur.']);
+        } catch (Exception $e) {
+            // Annulation totale en cas d'erreur
+            $pdo->rollBack();
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Marque un trajet comme "Démarré".
+     * Route : POST /api/startTrajet
+     */
+    public static function startTrajet(PDO $pdo, int $trajetId)
+    {
+        self::changeTrajetStatus($pdo, $trajetId, 'en_cours', 'planifié', 'Le trajet a démarré.');
+    }
+
+    /**
+     * Marque un trajet comme "Terminé".
+     * Déclenche l'envoi d'emails aux passagers pour qu'ils laissent un avis.
+     * Route : POST /api/endTrajet
+     */
+    public static function endTrajet(PDO $pdo, int $trajetId)
+    {
+        // On change d'abord le statut
+        $success = self::changeTrajetStatus($pdo, $trajetId, 'terminé', 'en_cours', 'Le trajet est terminé.');
+
+        if ($success) {
+            // Si le statut a bien changé, on notifie les passagers
+            $reservationModel = new ReservationModel($pdo);
+            $passagers = $reservationModel->getConfirmedPassagers($trajetId);
+
+            foreach ($passagers as $passager) {
+                // Appel au Service Mailer pour chaque passager
+                MailerService::send(
+                    $passager['email'],
+                    $passager['pseudo'],
+                    'Trajet terminé',
+                    "Le trajet est terminé. Merci de le valider sur votre espace pour laisser un avis et payer le chauffeur."
+                );
+            }
+        }
+    }
+
+    /**
+     * Méthode privée utilitaire pour changer le statut d'un trajet.
+     * Factorise le code de startTrajet et endTrajet.
+     */
+    private static function changeTrajetStatus(PDO $pdo, int $trajetId, string $newStatus, string $requiredOldStatus, string $successMessage)
+    {
+        header('Content-Type: application/json');
+        try {
+            $trajetModel = new TrajetModel($pdo);
+            // updateStatusConditional vérifie que l'ancien statut est bien celui attendu
+            // (ex: on ne peut pas finir un trajet qui n'a pas démarré)
+            $rowCount = $trajetModel->updateStatusConditional($trajetId, $newStatus, $requiredOldStatus);
+
+            if ($rowCount > 0) {
+                echo json_encode(['success' => true, 'message' => $successMessage]);
+                return true;
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Impossible de changer le statut (état incorrect).']);
+                return false;
+            }
+        } catch (Exception $e) {
+            error_log("Erreur changeTrajetStatus : " . $e->getMessage());
+            echo json_encode(['success' => false, 'message' => 'Erreur serveur.']);
+            return false;
+        }
+    }
+
+    /**
+     * Permet au chauffeur de confirmer ou refuser une réservation.
+     * Route : POST /api/confirmReservation
+     */
+    public static function confirmerReservation(PDO $pdo, int $reservationId, string $statut)
+    {
+        if (!isset($_SESSION['user_id'])) {
+            header('Location: /login');
+            exit;
+        }
+
+        try {
+            $reservationModel = new ReservationModel($pdo);
+            // Vérification de sécurité : le chauffeur ne peut confirmer QUE ses propres trajets
+            $reservation = $reservationModel->findReservationForChauffeur($reservationId, $_SESSION['user_id']);
+
+            if (!$reservation) {
+                $_SESSION['message'] = ['type' => 'danger', 'text' => 'Réservation introuvable ou droits insuffisants.'];
+            } else {
+                // Mise à jour du statut
+                $reservationModel->updateStatus($reservationId, $statut);
+                $_SESSION['message'] = ['type' => 'success', 'text' => "Réservation $statut."];
+
+                // (Optionnel : Notifier le passager via MailerService ici)
+            }
+        } catch (Exception $e) {
+            error_log("Erreur confirmerReservation : " . $e->getMessage());
+            $_SESSION['message'] = ['type' => 'danger', 'text' => 'Erreur serveur.'];
+        }
+
+        header('Location: /profile');
+        exit;
+    }
+
+    /**
+     * Annulation par le Passager.
+     * Remboursement des crédits si annulé à temps.
+     * Route : POST /api/cancelReservation
+     */
+    public static function cancelReservation(PDO $pdo, int $reservationId)
+    {
+        header('Content-Type: application/json');
+        if (!isset($_SESSION['user_id'])) {
+            echo json_encode(['success' => false, 'message' => 'Non connecté.']);
+            exit;
+        }
+
+        try {
+            // 1. Transaction (Remboursement + Annulation)
+            $pdo->beginTransaction();
+
+            $reservationModel = new ReservationModel($pdo);
+            $trajetModel = new TrajetModel($pdo);
+            $userModel = new UserModel($pdo);
+
+            // 2. Vérifications
+            $reservation = $reservationModel->findReservationForPassager($reservationId, $_SESSION['user_id']);
+            if (!$reservation) throw new Exception('Réservation introuvable.');
+            // On ne peut annuler que si le trajet n'a pas encore démarré
+            if ($reservation['trajet_statut'] !== 'planifié') throw new Exception('Trop tard pour annuler.');
+
+            // 3. Modifications
+            $reservationModel->updateStatus($reservationId, 'annulée');
+            // On libère la place pour quelqu'un d'autre
+            $trajetModel->incrementPlaces($reservation['covoiturage_id']);
+
+            // 4. Remboursement
+            // Prix du trajet + frais de réservation (2 crédits)
+            $refundAmount = $reservation['prix'] + 2;
+            $userModel->creditCredits($_SESSION['user_id'], $refundAmount);
+
+            // 5. Validation
+            $pdo->commit();
+            echo json_encode(['success' => true, 'message' => 'Réservation annulée et crédits remboursés.']);
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Annulation du trajet complet par le Chauffeur.
+     * Doit rembourser TOUS les passagers.
+     * Route : POST /api/cancelTrajet
+     */
+    public static function cancelTrajet(PDO $pdo, int $trajetId)
+    {
+        header('Content-Type: application/json');
+        if (!isset($_SESSION['user_id'])) {
+            echo json_encode(['success' => false, 'message' => 'Non connecté.']);
+            exit;
+        }
+
+        try {
+            // 1. Transaction de masse
+            $pdo->beginTransaction();
+
+            $trajetModel = new TrajetModel($pdo);
+            $reservationModel = new ReservationModel($pdo);
+            $userModel = new UserModel($pdo);
+
+            // 2. Vérification droits chauffeur
+            $trajet = $trajetModel->findFullTrajetById($trajetId);
+            if (!$trajet || $trajet['chauffeur_id'] != $_SESSION['user_id']) {
+                throw new Exception('Trajet invalide ou accès refusé.');
+            }
+
+            // 3. Annulation du trajet
+            $trajetModel->updateStatus($trajetId, 'annulé');
+
+            // 4. Remboursement en boucle des passagers
+            $passagers = $reservationModel->getConfirmedPassagers($trajetId);
+            foreach ($passagers as $passager) {
+                $refundAmount = $trajet['prix'] + 2;
+
+                // Remboursement
+                $userModel->creditCredits($passager['utilisateur_id'], $refundAmount);
+                // Annulation de la réservation
+                $reservationModel->updateStatus($passager['id'], 'annulée');
+
+                // Notification Email via Service
+                MailerService::send(
+                    $passager['email'],
+                    $passager['pseudo'],
+                    'Trajet annulé',
+                    "Le conducteur a annulé le trajet. Vous avez été intégralement remboursé de $refundAmount crédits."
+                );
+            }
+
+            // 5. Validation
+            $pdo->commit();
+            echo json_encode(['success' => true, 'message' => 'Trajet annulé. Tous les passagers ont été remboursés.']);
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            error_log("Erreur cancelTrajet : " . $e->getMessage());
+            echo json_encode(['success' => false, 'message' => 'Erreur serveur.']);
+        }
+    }
+
+    /**
+     * Affiche la page de détail d'un trajet (GET).
+     * Appelle plusieurs modèles pour tout afficher (Trajet, Passagers, Avis).
      */
     public static function showTrajetDetail(PDO $pdo, int $trajetId)
     {
         try {
-            // 1. Instancier les modèles
             $trajetModel = new TrajetModel($pdo);
+            $userController = new UserController(); // Instance pour accéder à MongoDB
             $reservationModel = new ReservationModel($pdo);
             $avisModel = new AvisModel($pdo);
-            $userController = new UserController(); // Pour la logique MongoDB des préférences
 
-            // 2. Récupérer les données via les modèles
+            // 1. Infos principales
             $trajet = $trajetModel->findFullTrajetById($trajetId);
 
             if (!$trajet) {
@@ -114,370 +388,24 @@ class TrajetController
                 exit();
             }
 
-            // On sépare la récupération des données
-            $passagers = $reservationModel->getPassagersByTrajet($trajetId);
-            $avis = $avisModel->getChauffeurAvisValides($trajet['chauffeur_id']);
-            $preferences = $userController->getUserPreferences($trajet['chauffeur_id']); // Logique Mongo
+            // 2. Infos complémentaires (Hybride SQL/NoSQL)
+            $preferences = $userController->getUserPreferences($trajet['chauffeur_id']); // MongoDB
+            $passagers = $reservationModel->getPassagersByTrajet($trajetId); // SQL
+            $avis = $avisModel->getChauffeurAvisValides($trajet['chauffeur_id']); // SQL
 
-            // 3. Préparer les données pour la vue
+            // 3. Envoi à la vue
             $data = [
                 'trajet' => $trajet,
-                'passagers' => $passagers,
-                'avis' => $avis,
                 'preferences' => $preferences,
-                'isDriver' => (isset($_SESSION['user_id']) && $_SESSION['user_id'] == $trajet['chauffeur_id'])
+                'passagers' => $passagers,
+                'avis' => $avis
             ];
 
-            // 4. Rendre la vue
             \renderView('covoiturage-detail', $data);
-        } catch (PDOException $e) {
+        } catch (Exception $e) {
             error_log("Erreur showTrajetDetail : " . $e->getMessage());
-            $_SESSION['message'] = ['type' => 'error', 'text' => 'Erreur lors de la récupération des détails du trajet.'];
             header('Location: /covoiturage');
             exit();
         }
-    }
-
-    /**
-     * Gère la réservation d'un trajet par un passager
-     */
-    public static function participerTrajet(PDO $pdo, int $trajetId, int $userId)
-    {
-        header('Content-Type: application/json');
-
-        try {
-            $pdo->beginTransaction();
-
-            // 1. Instancier les modèles
-            $trajetModel = new TrajetModel($pdo);
-            $userModel = new UserModel($pdo);
-            $reservationModel = new ReservationModel($pdo);
-
-            // 2. Logique métier : Vérifications
-            if ($reservationModel->hasActiveReservation($userId, $trajetId)) {
-                throw new \Exception('Vous êtes déjà inscrit à ce trajet.');
-            }
-
-            $trajet = $trajetModel->findByIdForUpdate($trajetId);
-            if (!$trajet) {
-                throw new \Exception('Trajet non trouvé.');
-            }
-            if ($trajet['places_disponibles'] <= 0) {
-                throw new \Exception('Plus de places disponibles.');
-            }
-            if ($trajet['chauffeur_id'] == $userId) {
-                throw new \Exception('Vous ne pouvez pas réserver votre propre trajet.');
-            }
-            if ($trajet['statut'] !== 'planifié') {
-                throw new \Exception('Ce trajet n\'est plus ouvert aux réservations.');
-            }
-
-            $creditsPassager = $userModel->getCreditsForUpdate($userId);
-            if ($creditsPassager === false || $creditsPassager < $trajet['prix']) {
-                throw new \Exception('Crédits insuffisants.');
-            }
-
-            // 3. Exécution via les modèles
-            $userModel->debitCredits($userId, $trajet['prix']);
-            $trajetModel->decrementPlaces($trajetId);
-            $reservationModel->create($userId, $trajetId, 'en_attente'); // Statut US 8
-
-            // 4. Commit et réponse
-            $pdo->commit();
-            echo json_encode(['success' => true, 'message' => 'Réservation effectuée ! Elle est en attente de confirmation par le chauffeur.']);
-        } catch (\Exception $e) {
-            // 5. Gestion des erreurs
-            $pdo->rollBack();
-            error_log("Erreur participerTrajet : " . $e->getMessage());
-            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-        }
-        exit();
-    }
-
-    /**
-     * Gère la confirmation/refus d'une réservation par un chauffeur
-     */
-    public static function confirmerReservation(PDO $pdo, int $reservationId, string $statut)
-    {
-        if (!isset($_SESSION['user_id']) || !in_array($statut, ['confirmée', 'refusée'])) {
-            $_SESSION['message'] = ['type' => 'danger', 'text' => 'Action invalide.'];
-            header('Location: /profile');
-            exit;
-        }
-        $chauffeurId = $_SESSION['user_id'];
-
-        try {
-            // 1. Instancier les modèles
-            $reservationModel = new ReservationModel($pdo);
-            $userModel = new UserModel($pdo);
-
-            // 2. Logique métier : Vérifier les droits
-            $reservationData = $reservationModel->findReservationForChauffeur($reservationId, $chauffeurId);
-            if (!$reservationData) {
-                throw new \Exception('Réservation non trouvée ou vous n\'êtes pas le chauffeur de ce trajet.');
-            }
-
-            // 3. Exécution via les modèles
-            $reservationModel->updateStatus($reservationId, $statut);
-
-            // 4. Logique métier : Notifier le passager
-            $message = "";
-            if ($statut === 'confirmée') {
-                $message = "Bonne nouvelle ! Votre réservation pour le trajet de " . htmlspecialchars($reservationData['depart']) . " à " . htmlspecialchars($reservationData['arrivee']) . " a été confirmée.";
-            } else if ($statut === 'refusée') {
-                $message = "Désolé, votre réservation pour le trajet de " . htmlspecialchars($reservationData['depart']) . " à " . htmlspecialchars($reservationData['arrivee']) . " a été refusée par le chauffeur.";
-                // TODO: Logique de remboursement si l'argent a été pris à la réservation
-            }
-
-            if ($message) {
-                $userModel->createNotification($reservationData['utilisateur_id'], $message);
-            }
-
-            $_SESSION['message'] = ['type' => 'success', 'text' => 'La réservation a bien été traitée.'];
-        } catch (\Exception $e) {
-            error_log("Erreur confirmerReservation : " . $e->getMessage());
-            $_SESSION['message'] = ['type' => 'danger', 'text' => $e->getMessage()];
-        }
-
-        header('Location: /profile');
-        exit();
-    }
-
-    /**
-     * Gère le démarrage d'un trajet (US 11)
-     */
-    public static function startTrajet(PDO $pdo, int $trajetId)
-    {
-        header('Content-Type: application/json');
-        if (!isset($_SESSION['user_id'])) {
-            echo json_encode(['success' => false, 'message' => 'Vous devez être connecté.']);
-            exit;
-        }
-        $userId = $_SESSION['user_id'];
-
-        try {
-            $trajetModel = new TrajetModel($pdo);
-
-            // 1. Vérifier le propriétaire (on pourrait le faire dans le modèle, mais c'est une règle métier)
-            $trajet = $trajetModel->findByIdForUpdate($trajetId); // FOR UPDATE pour la transaction
-            if (!$trajet || $trajet['chauffeur_id'] != $userId) {
-                throw new \Exception('Action non autorisée.');
-            }
-
-            // 2. Exécuter la mise à jour
-            $rowsAffected = $trajetModel->updateStatusConditional($trajetId, 'en_cours', 'planifié');
-            if ($rowsAffected == 0) {
-                throw new \Exception('Le trajet n\'a pas pu être démarré (il est peut-être déjà en cours ou terminé).');
-            }
-
-            echo json_encode(['success' => true, 'message' => 'Trajet démarré avec succès.']);
-        } catch (\Exception $e) {
-            error_log("Erreur dans startTrajet : " . $e->getMessage());
-            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-        }
-        exit();
-    }
-
-    /**
-     * Gère la fin d'un trajet (US 11)
-     */
-    public static function endTrajet(PDO $pdo, int $trajetId)
-    {
-        header('Content-Type: application/json');
-        if (!isset($_SESSION['user_id'])) {
-            echo json_encode(['success' => false, 'message' => 'Vous devez être connecté.']);
-            exit;
-        }
-        $userId = $_SESSION['user_id'];
-
-        try {
-            $pdo->beginTransaction();
-
-            $trajetModel = new TrajetModel($pdo);
-            $reservationModel = new ReservationModel($pdo);
-            $userModel = new UserModel($pdo);
-
-            // 1. Vérifier le propriétaire
-            $trajet = $trajetModel->findByIdForUpdate($trajetId);
-            if (!$trajet || $trajet['chauffeur_id'] != $userId) {
-                throw new \Exception('Action non autorisée.');
-            }
-
-            // 2. Mettre à jour le statut du trajet
-            $rowsAffected = $trajetModel->updateStatusConditional($trajetId, 'terminé', 'en_cours');
-            if ($rowsAffected == 0) {
-                throw new \Exception('Le trajet n\'a pas pu être terminé (il n\'était pas en cours).');
-            }
-
-            // 3. Notifier les passagers (Email + Notification interne)
-            $passagers = $reservationModel->getConfirmedPassagers($trajetId);
-            $message = "Votre trajet de " . htmlspecialchars($trajet['depart']) . " à " . htmlspecialchars($trajet['arrivee']) . " est terminé. N'oubliez pas de le valider sur votre profil !";
-
-            foreach ($passagers as $passager) {
-                // Notification interne
-                $userModel->createNotification($passager['utilisateur_id'], $message);
-
-                // Envoi d'email (simulé)
-                self::sendSimulationEmail(
-                    $passager['email'],
-                    $passager['pseudo'],
-                    'Votre trajet EcoRide est terminé !',
-                    $message
-                );
-            }
-
-            $pdo->commit();
-            echo json_encode(['success' => true, 'message' => 'Trajet terminé. Les passagers ont été notifiés.']);
-        } catch (\Exception $e) {
-            $pdo->rollBack();
-            error_log("Erreur dans endTrajet : " . $e->getMessage());
-            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-        }
-        exit();
-    }
-
-    /**
-     * Gère l'annulation d'une réservation par le passager
-     */
-    public static function cancelReservation(PDO $pdo, int $reservationId)
-    {
-        header('Content-Type: application/json');
-        if (!isset($_SESSION['user_id'])) {
-            echo json_encode(['success' => false, 'message' => 'Vous devez être connecté.']);
-            exit;
-        }
-        $passagerId = $_SESSION['user_id'];
-
-        try {
-            $pdo->beginTransaction();
-
-            // 1. Instancier les modèles
-            $reservationModel = new ReservationModel($pdo);
-            $trajetModel = new TrajetModel($pdo);
-            $userModel = new UserModel($pdo);
-
-            // 2. Logique métier : Vérifier les droits
-            $reservation = $reservationModel->findReservationForPassager($reservationId, $passagerId);
-            if (!$reservation) {
-                throw new \Exception('Réservation non trouvée ou déjà annulée/terminée.');
-            }
-            if ($reservation['trajet_statut'] !== 'planifié') {
-                throw new \Exception('Annulation impossible. Le trajet a peut-être déjà commencé.');
-            }
-
-            // 3. Exécution via les modèles
-            $reservationModel->updateStatus($reservationId, 'annulée');
-            $userModel->creditCredits($passagerId, $reservation['prix']); // Rembourser
-            $trajetModel->incrementPlaces($reservation['covoiturage_id']); // Rajouter la place
-
-            // 4. Commit et réponse
-            $pdo->commit();
-            echo json_encode(['success' => true, 'message' => 'Votre réservation a été annulée et vos crédits vous ont été remboursés.']);
-        } catch (\Exception $e) {
-            $pdo->rollBack();
-            error_log("Erreur dans cancelReservation : " . $e->getMessage());
-            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-        }
-        exit();
-    }
-
-    /**
-     * Gère l'annulation d'un trajet par le chauffeur
-     */
-    public static function cancelTrajet(PDO $pdo, int $trajetId)
-    {
-        header('Content-Type: application/json');
-        if (!isset($_SESSION['user_id'])) {
-            echo json_encode(['success' => false, 'message' => 'Vous devez être connecté.']);
-            exit;
-        }
-        $chauffeurId = $_SESSION['user_id'];
-
-        try {
-            $pdo->beginTransaction();
-
-            // 1. Instancier les modèles
-            $trajetModel = new TrajetModel($pdo);
-            $reservationModel = new ReservationModel($pdo);
-            $userModel = new UserModel($pdo);
-
-            // 2. Logique métier : Vérifier les droits
-            $trajet = $trajetModel->findByIdForUpdate($trajetId);
-            if (!$trajet || $trajet['chauffeur_id'] != $chauffeurId) {
-                throw new \Exception('Action non autorisée.');
-            }
-            if ($trajet['statut'] !== 'planifié') {
-                throw new \Exception('Annulation impossible (trajet non planifié).');
-            }
-
-            // 3. Mettre à jour le statut du trajet
-            $trajetModel->updateStatus($trajetId, 'annulé');
-
-            // 4. Gérer les passagers (Remboursement + Notification)
-            $passagers = $reservationModel->getConfirmedPassagers($trajetId);
-            $message = "Le trajet de " . htmlspecialchars($trajet['depart']) . " à " . htmlspecialchars($trajet['arrivee']) . " a été annulé par le chauffeur. Vos crédits ont été remboursés.";
-
-            foreach ($passagers as $passager) {
-                $userModel->creditCredits($passager['utilisateur_id'], $trajet['prix']); // Rembourser
-                $reservationModel->updateStatus($passager['id'], 'annulée'); // Annuler leur réservation
-                $userModel->createNotification($passager['utilisateur_id'], $message); // Notifier
-
-                // Envoyer email (simulation)
-                self::sendSimulationEmail(
-                    $passager['email'],
-                    $passager['pseudo'],
-                    'Annulation de votre trajet EcoRide',
-                    $message
-                );
-            }
-
-            // 5. Commit et réponse
-            $pdo->commit();
-            echo json_encode(['success' => true, 'message' => 'Le trajet a été annulé. Les passagers ont été notifiés et remboursés.']);
-        } catch (\Exception $e) {
-            $pdo->rollBack();
-            error_log("Erreur dans cancelTrajet : " . $e->getMessage());
-            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-        }
-        exit();
-    }
-
-    /**
-     * Simule l'envoi d'un email en écrivant dans les logs
-     * (Remplace le bloc PHPMailer pour la propreté)
-     */
-    private static function sendSimulationEmail(string $email, string $pseudo, string $sujet, string $corps)
-    {
-        // Bloc PHPMailer original ici, mais commenté
-        error_log("SIMULATION EMAIL: \n Destinataire: $email ($pseudo) \n Sujet: $sujet \n Corps: $corps\n");
-
-        /*
-        $mail = new PHPMailer(true);
-        try {
-            // Configuration du serveur SMTP (à mettre dans votre fichier .env)
-            $mail->isSMTP();
-            $mail->Host       = $_ENV['MAIL_HOST'];
-            $mail->SMTPAuth   = true;
-            $mail->Username   = $_ENV['MAIL_USERNAME'];
-            $mail->Password   = $_ENV['MAIL_PASSWORD'];
-            $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-            $mail->Port       = $_ENV['MAIL_PORT'];
-
-            // Destinataires et expéditeur
-            $mail->setFrom('no-reply@ecoride.fr', 'EcoRide');
-            $mail->addAddress($email, $pseudo);
-
-            // Contenu de l'e-mail
-            $mail->isHTML(true);
-            $mail->Subject = $sujet;
-            $mail->Body    = 'Bonjour ' . htmlspecialchars($pseudo) . ',<br><br>' . $corps;
-            $mail->AltBody = 'Bonjour ' . htmlspecialchars($pseudo) . ', ' . strip_tags($corps);
-
-            $mail->send();
-        } catch (Exception $e) {
-            // Ne pas bloquer le processus si un email échoue, mais l'enregistrer
-            error_log("PHPMailer n'a pas pu envoyer l'email à " . $email . ". Erreur: {$mail->ErrorInfo}");
-        }
-        */
     }
 }

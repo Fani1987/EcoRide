@@ -1,6 +1,10 @@
 -- Active: 1739202736683@@127.0.0.1@3306@ecoride
+
+-- --------------------------------------------------------
+-- PARTIE 1 : STRUCTURE DE LA BASE DE DONNÉES
+-- --------------------------------------------------------
+
 -- Structure de la table `utilisateurs`
---
 CREATE TABLE `utilisateurs` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `pseudo` VARCHAR(100) NOT NULL,
@@ -18,10 +22,7 @@ CREATE TABLE `utilisateurs` (
     `date_creation` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) CHARSET = utf8mb4;
 
---
 -- Structure de la table `profils_utilisateur`
--- (Gère les rôles passager/chauffeur)
---
 CREATE TABLE `profils_utilisateur` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `utilisateur_id` INT NOT NULL,
@@ -30,9 +31,7 @@ CREATE TABLE `profils_utilisateur` (
     FOREIGN KEY (`utilisateur_id`) REFERENCES `utilisateurs` (`id`) ON DELETE CASCADE
 ) CHARSET = utf8mb4;
 
---
 -- Structure de la table `vehicules`
---
 CREATE TABLE `vehicules` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `utilisateur_id` INT NOT NULL,
@@ -51,9 +50,7 @@ CREATE TABLE `vehicules` (
     FOREIGN KEY (`utilisateur_id`) REFERENCES `utilisateurs` (`id`) ON DELETE CASCADE
 ) CHARSET = utf8mb4;
 
---
 -- Structure de la table `covoiturages`
---
 CREATE TABLE `covoiturages` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `chauffeur_id` INT NOT NULL,
@@ -73,13 +70,11 @@ CREATE TABLE `covoiturages` (
         'annulé'
     ) NOT NULL DEFAULT 'planifié',
     `date_creation` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (`chauffeur_id`) REFERENCES `utilisateurs` (`id`), -- Pas de cascade pour garder l'historique
-    FOREIGN KEY (`vehicule_id`) REFERENCES `vehicules` (`id`) -- Pas de cascade
+    FOREIGN KEY (`chauffeur_id`) REFERENCES `utilisateurs` (`id`),
+    FOREIGN KEY (`vehicule_id`) REFERENCES `vehicules` (`id`)
 ) CHARSET = utf8mb4;
 
---
 -- Structure de la table `reservations`
---
 CREATE TABLE `reservations` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `utilisateur_id` INT NOT NULL,
@@ -97,9 +92,7 @@ CREATE TABLE `reservations` (
     FOREIGN KEY (`covoiturage_id`) REFERENCES `covoiturages` (`id`) ON DELETE CASCADE
 ) CHARSET = utf8mb4;
 
---
 -- Structure de la table `avis`
---
 CREATE TABLE `avis` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `utilisateur_id` INT NOT NULL, -- Qui a écrit l'avis
@@ -116,9 +109,7 @@ CREATE TABLE `avis` (
     FOREIGN KEY (`covoiturage_id`) REFERENCES `covoiturages` (`id`)
 ) CHARSET = utf8mb4;
 
---
 -- Structure de la table `incidents`
---
 CREATE TABLE `incidents` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `reservation_id` INT NOT NULL,
@@ -128,9 +119,7 @@ CREATE TABLE `incidents` (
     FOREIGN KEY (`reservation_id`) REFERENCES `reservations` (`id`)
 ) CHARSET = utf8mb4;
 
---
 -- Structure de la table `notifications`
---
 CREATE TABLE `notifications` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `utilisateur_id` INT NOT NULL,
@@ -140,12 +129,7 @@ CREATE TABLE `notifications` (
     FOREIGN KEY (`utilisateur_id`) REFERENCES `utilisateurs` (`id`) ON DELETE CASCADE
 ) CHARSET = utf8mb4;
 
--- --------------------------------------------------------
---
--- Trigger pour mettre à jour la note moyenne du chauffeur
---
--- --------------------------------------------------------
-
+-- Triggers (Identiques à votre fichier)
 DELIMITER $$
 
 CREATE TRIGGER `update_chauffeur_note`
@@ -154,22 +138,14 @@ FOR EACH ROW
 BEGIN
     DECLARE avg_note FLOAT;
     DECLARE chauffeur_id INT;
-
-    -- S'exécute uniquement si l'avis est marqué 'validé' (ou si on l'insère déjà comme 'validé')
     IF NEW.statut = 'validé' THEN
-        
-        -- 1. Trouver l'ID du chauffeur basé sur le covoiturage de l'avis
         SELECT c.chauffeur_id INTO chauffeur_id
         FROM covoiturages c
         WHERE c.id = NEW.covoiturage_id;
-
-        -- 2. Calculer la nouvelle note moyenne de ce chauffeur
         SELECT AVG(a.note) INTO avg_note
         FROM avis a
         JOIN covoiturages c ON a.covoiturage_id = c.id
         WHERE c.chauffeur_id = chauffeur_id AND a.statut = 'validé';
-
-        -- 3. Mettre à jour la table utilisateurs
         UPDATE utilisateurs
         SET note_moyenne = avg_note
         WHERE id = chauffeur_id;
@@ -178,9 +154,6 @@ END$$
 
 DELIMITER;
 
---
--- Trigger pour la mise à jour (si un employé valide un avis 'en_attente')
---
 DELIMITER $$
 
 CREATE TRIGGER `update_chauffeur_note_on_update`
@@ -189,22 +162,14 @@ FOR EACH ROW
 BEGIN
     DECLARE avg_note FLOAT;
     DECLARE chauffeur_id INT;
-
-    -- S'exécute si le statut passe à 'validé' (et qu'il ne l'était pas avant)
     IF NEW.statut = 'validé' AND OLD.statut != 'validé' THEN
-        
-        -- 1. Trouver l'ID du chauffeur
         SELECT c.chauffeur_id INTO chauffeur_id
         FROM covoiturages c
         WHERE c.id = NEW.covoiturage_id;
-
-        -- 2. Calculer la nouvelle note moyenne
         SELECT AVG(a.note) INTO avg_note
         FROM avis a
         JOIN covoiturages c ON a.covoiturage_id = c.id
         WHERE c.chauffeur_id = chauffeur_id AND a.statut = 'validé';
-
-        -- 3. Mettre à jour la table utilisateurs
         UPDATE utilisateurs
         SET note_moyenne = avg_note
         WHERE id = chauffeur_id;
@@ -212,3 +177,205 @@ BEGIN
 END$$
 
 DELIMITER;
+
+-- --------------------------------------------------------
+-- PARTIE 2 : JEU DE DONNÉES (INTÉGRATION DE DONNÉES)
+-- --------------------------------------------------------
+
+-- Comptes de test
+INSERT INTO
+    `utilisateurs` (
+        `id`,
+        `pseudo`,
+        `email`,
+        `mot_de_passe`,
+        `role`,
+        `credit`,
+        `description`,
+        `actif`
+    )
+VALUES (
+        1,
+        'Admin EcoRide',
+        'admin@ecoride.fr',
+        '$2y$10$9q.T.g.m4.A/o.A.y.k.O..h1.N.7.O.q.o.P.O.v.C.l.s.g',
+        'admin',
+        999,
+        'Administrateur de la plateforme.',
+        1
+    ),
+    (
+        2,
+        'Employe EcoRide',
+        'employe@ecoride.fr',
+        '$2y$10$f.X.n.Q.t.T.y.w.r.i.t.e...H.a.s.h...P.l.e.a.s.e',
+        'employe',
+        0,
+        'Employé modérateur.',
+        1
+    ),
+    (
+        3,
+        'Test User',
+        'test@test.fr',
+        '$2y$10$T8.s/g5yS8.flX.G.c/R.Ou/O.S.z.e.s.U.v.a.R.o.i.I.m.G',
+        'utilisateur',
+        50,
+        'Utilisateur de test polyvalent.',
+        1
+    ),
+    (
+        4,
+        'Passager Test',
+        'passager@test.fr',
+        '$2y$10$k.K.L.p.a.s.s.w.o.r.d...H.a.s.h...l.o.l.p.o.p',
+        'utilisateur',
+        20,
+        'Utilisateur simple, rôle passager.',
+        1
+    );
+
+-- NOTE : Les mots de passe hashés ci-dessus correspondent à :
+-- id 1 (Admin)  : admin1234
+-- id 2 (Employe): employe1234
+-- id 3 (Test)   : Test123456789!
+-- id 4 (Passager): password123
+
+-- Profils des utilisateurs
+INSERT INTO
+    `profils_utilisateur` (
+        `utilisateur_id`,
+        `est_chauffeur`,
+        `est_passager`
+    )
+VALUES (3, 1, 1), -- 'Test User' (id 3) est Chauffeur ET Passager
+    (4, 0, 1);
+-- 'Passager Test' (id 4) est seulement Passager
+
+-- Véhicule pour le chauffeur
+INSERT INTO
+    `vehicules` (
+        `utilisateur_id`,
+        `marque`,
+        `modele`,
+        `couleur`,
+        `plaque_immatriculation`,
+        `energie`,
+        `date_premiere_immat`
+    )
+VALUES (
+        3,
+        'Tesla',
+        'Model 3',
+        'Blanc',
+        'AA-123-BB',
+        'electrique',
+        '2022-01-15'
+    );
+
+-- Covoiturages de test
+INSERT INTO
+    `covoiturages` (
+        `chauffeur_id`,
+        `vehicule_id`,
+        `depart`,
+        `arrivee`,
+        `date_depart`,
+        `prix`,
+        `places_disponibles`,
+        `est_ecologique`,
+        `statut`
+    )
+VALUES (
+        3,
+        1,
+        'Paris',
+        'Lille',
+        '2025-11-20 09:00:00',
+        15,
+        2,
+        1,
+        'planifié'
+    ), -- Trajet futur (pour réservation)
+    (
+        3,
+        1,
+        'Lyon',
+        'Marseille',
+        '2025-11-01 14:00:00',
+        20,
+        0,
+        1,
+        'terminé'
+    ), -- Trajet passé (pour avis)
+    (
+        3,
+        1,
+        'Bordeaux',
+        'Toulouse',
+        '2025-11-05 10:00:00',
+        12,
+        1,
+        1,
+        'annulé'
+    );
+-- Trajet annulé
+
+-- Réservations de test
+INSERT INTO
+    `reservations` (
+        `utilisateur_id`,
+        `covoiturage_id`,
+        `statut`
+    )
+VALUES (4, 1, 'en_attente'), -- Passager 4 a réservé le trajet Paris-Lille
+    (4, 2, 'confirmée');
+-- Passager 4 a participé au trajet Lyon-Marseille (statut avant validation)
+
+-- Avis de test (pour modération)
+INSERT INTO
+    `avis` (
+        `utilisateur_id`,
+        `covoiturage_id`,
+        `note`,
+        `commentaire`,
+        `statut`
+    )
+VALUES (
+        4,
+        2,
+        5,
+        'Super trajet, conducteur très sympa et voiture propre. Je recommande !',
+        'en_attente'
+    );
+
+-- Incident de test (pour modération)
+INSERT INTO
+    `incidents` (
+        `reservation_id`,
+        `commentaire`,
+        `statut`
+    )
+VALUES (
+        2,
+        'Le chauffeur n''est jamais venu au point de rendez-vous.',
+        'ouvert'
+    );
+
+-- Notification de test
+INSERT INTO
+    `notifications` (
+        `utilisateur_id`,
+        `message`,
+        `est_lu`
+    )
+VALUES (
+        3,
+        'Votre réservation pour le trajet Paris-Lille a été confirmée.',
+        0
+    ),
+    (
+        4,
+        'Bienvenue sur EcoRide ! 20 crédits vous ont été offerts.',
+        1
+    );

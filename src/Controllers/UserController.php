@@ -5,10 +5,7 @@ namespace App\Controllers;
 use App\Core\Database;
 use PDO;
 use PDOException;
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
-
-// Import de TOUS les modèles nécessaires
+// Modèles nécessaires pour l'agrégation de données du profil
 use App\Models\UserModel;
 use App\Models\AvisModel;
 use App\Models\VehiculeModel;
@@ -16,11 +13,17 @@ use App\Models\TrajetModel;
 use App\Models\ReservationModel;
 use App\Models\NotificationModel;
 
+/**
+ * Class UserController
+ * * Responsabilité : Gérer le profil de l'utilisateur et ses préférences.
+ * C'est le contrôleur "Central" pour l'espace membre.
+ */
 class UserController
 {
-    // -----------------------------------------------------------------
-    // LOGIQUE MONGODB (NON-SQL) - ON LA LAISSE TELLE QUELLE
-    // -----------------------------------------------------------------
+    // =================================================================
+    // LOGIQUE MONGODB (PRÉFÉRENCES)
+    // Les préférences sont gérées ici car elles sont intrinsèquement liées à l'utilisateur.
+    // =================================================================
 
     public function getUserPreferences(int $mysqlUserId)
     {
@@ -29,9 +32,10 @@ class UserController
         $preferencesCollection = $database->selectCollection('preferences');
 
         try {
+            // Recherche par ID externe (la clé étrangère vers MySQL)
             $userPreferences = $preferencesCollection->findOne(['mysql_user_id' => $mysqlUserId]);
             return $userPreferences ? (array)$userPreferences->preferences : [];
-        } catch (\MongoDB\Driver\Exception\Exception $e) {
+        } catch (\Exception $e) {
             error_log("Erreur MongoDB (get) : " . $e->getMessage());
             return [];
         }
@@ -44,39 +48,41 @@ class UserController
         $preferencesCollection = $database->selectCollection('preferences');
 
         try {
+            // Utilisation de 'upsert' (Update or Insert)
+            // Si le profil de préférences n'existe pas, il est créé.
             $updateResult = $preferencesCollection->updateOne(
                 ['mysql_user_id' => $mysqlUserId],
                 ['$set' => ['preferences' => $preferences]],
                 ['upsert' => true]
             );
             return $updateResult->getModifiedCount() > 0 || $updateResult->getUpsertedCount() > 0;
-        } catch (\MongoDB\Driver\Exception\Exception $e) {
+        } catch (\Exception $e) {
             error_log("Erreur MongoDB (save) : " . $e->getMessage());
             return false;
         }
     }
 
-    // -----------------------------------------------------------------
-    // LOGIQUE SQL REFACTORISÉE
-    // -----------------------------------------------------------------
+    // =================================================================
+    // LOGIQUE SQL (AFFICHAGE ET ÉDITION DE PROFIL)
+    // =================================================================
 
     /**
-     * Affiche la page de profil complète.
-     * C'est le "chef d'orchestre" qui appelle tous les modèles.
+     * Affiche la page de profil complète (Dashboard utilisateur).
+     * Agit comme un agrégateur de données provenant de multiples modèles.
      */
     public static function showProfilePage(PDO $pdo, int $userId)
     {
         try {
-            // 1. Instancier tous les modèles
+            // 1. Instanciation des modèles
             $userModel = new UserModel($pdo);
             $avisModel = new AvisModel($pdo);
             $vehiculeModel = new VehiculeModel($pdo);
             $trajetModel = new TrajetModel($pdo);
             $reservationModel = new ReservationModel($pdo);
             $notificationModel = new NotificationModel($pdo);
-            $userController = new UserController(); // Pour la logique Mongo
+            $userController = new UserController(); // Pour accéder aux méthodes Mongo (non statiques)
 
-            // 2. Récupérer les données via les modèles
+            // 2. Récupération de l'utilisateur principal
             $user = $userModel->findProfilById($userId);
             if (!$user) {
                 $_SESSION['message'] = ['type' => 'error', 'text' => 'Utilisateur non trouvé.'];
@@ -84,18 +90,22 @@ class UserController
                 exit();
             }
 
-            $preferences = $userController->getUserPreferences($userId);
-            $vehicules = $vehiculeModel->findByUserId($userId);
-            $trajetsProposes = $trajetModel->findByChauffeurId($userId);
-            $trajetsReserves = $reservationModel->getTrajetsReservesByUserId($userId);
+            // 3. Récupération des données associées
+            // Note : On mélange ici des données SQL et NoSQL
+            $preferences = $userController->getUserPreferences($userId); // NoSQL
+            $vehicules = $vehiculeModel->findByUserId($userId); // SQL
+            $trajetsProposes = $trajetModel->findByChauffeurId($userId); // SQL
+            $trajetsReserves = $reservationModel->getTrajetsReservesByUserId($userId); // SQL
+
             $avis = [];
             $reservationsEnAttente = [];
 
+            // 4. Chargement conditionnel (seulement si chauffeur)
             if ($user['est_chauffeur']) {
-                $avis = $avisModel->getChauffeurAvisValides($userId); // On ne montre que les avis validés
+                $avis = $avisModel->getChauffeurAvisValides($userId);
                 $reservationsEnAttente = $reservationModel->getPendingReservationsForChauffeur($userId);
 
-                // Logique pour attacher les passagers aux trajets proposés
+                // Récupération des passagers pour chaque trajet proposé
                 if (!empty($trajetsProposes)) {
                     foreach ($trajetsProposes as $key => $trajet) {
                         $trajetsProposes[$key]['passagers'] = $reservationModel->getPassagersByTrajet($trajet['id']);
@@ -103,7 +113,7 @@ class UserController
                 }
             }
 
-            // 3. Gérer la logique métier (type d'utilisateur)
+            // 5. Détermination du type d'affichage
             $type_utilisateur = '';
             if ($user['est_chauffeur'] && $user['est_passager']) {
                 $type_utilisateur = 'Chauffeur / Passager';
@@ -113,18 +123,21 @@ class UserController
                 $type_utilisateur = 'Passager';
             }
 
-            // 4. Gérer les notifications
+            // 6. Gestion des Notifications
+            // On vérifie si l'utilisateur consulte son PROPRE profil
             $isOwner = (isset($_SESSION['user_id']) && $_SESSION['user_id'] == $userId);
             $notificationsNonLues = [];
+
             if ($isOwner) {
                 $notificationsNonLues = $notificationModel->getUnread($userId);
+                // Si des notifications sont affichées, on les marque comme lues
                 if (!empty($notificationsNonLues)) {
                     $notificationIds = array_column($notificationsNonLues, 'id');
                     $notificationModel->markAsRead($notificationIds);
                 }
             }
 
-            // 5. Préparer les données pour la vue
+            // 7. Envoi des données à la vue
             $data = [
                 'user' => $user,
                 'isOwner' => $isOwner,
@@ -138,7 +151,6 @@ class UserController
                 'notificationsNonLues' => $notificationsNonLues,
             ];
 
-            // 6. Appeler la vue
             \renderView('profile', $data);
         } catch (PDOException $e) {
             error_log("Erreur showProfilePage : " . $e->getMessage());
@@ -149,7 +161,7 @@ class UserController
     }
 
     /**
-     * Affiche la page d'édition de profil.
+     * Affiche le formulaire d'édition de profil.
      */
     public static function showEditProfilePage(PDO $pdo)
     {
@@ -161,9 +173,10 @@ class UserController
 
         try {
             $userModel = new UserModel($pdo);
-            $userController = new UserController(); // Pour Mongo
+            $userController = new UserController();
 
-            $user = $userModel->findById($userId); // Utilise la méthode simple
+            // On récupère les données actuelles pour pré-remplir les champs
+            $user = $userModel->findById($userId);
             $preferences = $userController->getUserPreferences($userId);
 
             $data = [
@@ -173,14 +186,13 @@ class UserController
             \renderView('edit_profile', $data);
         } catch (PDOException $e) {
             error_log("Erreur showEditProfilePage : " . $e->getMessage());
-            $_SESSION['message'] = ['type' => 'danger', 'text' => 'Erreur lors du chargement.'];
             header('Location: /profile');
             exit();
         }
     }
 
     /**
-     * Gère la mise à jour du profil (SQL + Mongo).
+     * Gère la mise à jour du profil complet (Infos SQL + Préférences NoSQL).
      */
     public static function updateFullProfile(PDO $pdo, array $postData)
     {
@@ -191,11 +203,10 @@ class UserController
         $userId = $_SESSION['user_id'];
 
         try {
-            // --- LOGIQUE DE MISE À JOUR DU PROFIL (MySQL) ---
+            // --- ÉTAPE 1 : SQL (Transactionnel) ---
             $pdo->beginTransaction();
 
             $userModel = new UserModel($pdo);
-
             $pseudo = trim($postData['pseudo'] ?? '');
             $email = trim($postData['email'] ?? '');
             $description = trim($postData['description'] ?? '');
@@ -204,26 +215,29 @@ class UserController
 
             $pdo->commit();
 
-            // --- LOGIQUE DE MISE À JOUR DES PRÉFÉRENCES (MongoDB) ---
+            // --- ÉTAPE 2 : NoSQL (Flexible) ---
+            // Fusion des préférences cochées (checkbox) et personnalisées (input text)
             $finalPreferences = $postData['prefs'] ?? [];
+
             if (!empty($postData['custom_prefs'])) {
+                // Transformation de la chaîne "Vélo, Bagages" en tableau
                 $customPrefs = array_map('trim', explode(',', $postData['custom_prefs']));
                 $finalPreferences = array_merge($finalPreferences, array_filter($customPrefs));
             }
+            // Suppression des doublons
             $finalPreferences = array_unique($finalPreferences);
 
+            // Sauvegarde dans MongoDB
             $userController = new UserController();
             $userController->saveUserPreferences($userId, array_values($finalPreferences));
 
             $_SESSION['message'] = ['type' => 'success', 'text' => 'Profil mis à jour avec succès.'];
         } catch (PDOException $e) {
             $pdo->rollBack();
-            error_log("Erreur updateFullProfile (SQL) : " . $e->getMessage());
-            $_SESSION['message'] = ['type' => 'danger', 'text' => 'Une erreur SQL est survenue.'];
-        } catch (\MongoDB\Driver\Exception\Exception $e) {
-            // La transaction SQL a réussi, mais Mongo a échoué
-            error_log("Erreur updateFullProfile (Mongo) : " . $e->getMessage());
-            $_SESSION['message'] = ['type' => 'warning', 'text' => 'Profil mis à jour, mais les préférences n\'ont pas pu être sauvegardées.'];
+            $_SESSION['message'] = ['type' => 'danger', 'text' => 'Erreur SQL lors de la mise à jour.'];
+        } catch (\Exception $e) {
+            // Si Mongo échoue mais que SQL a réussi, on affiche un avertissement (pas une erreur fatale)
+            $_SESSION['message'] = ['type' => 'warning', 'text' => 'Profil mis à jour, mais erreur sur les préférences.'];
         }
 
         header('Location: /profile/edit');
@@ -231,127 +245,19 @@ class UserController
     }
 
     /**
-     * Gère l'ajout ou la mise à jour d'un véhicule (API).
+     * Fonction utilitaire pour le Cron Job.
+     * Maintient la connexion MongoDB active sur les hébergements gratuits.
      */
-    public static function updateVehicle(PDO $pdo, int $userId, array $postData)
+    public static function ping()
     {
         header('Content-Type: application/json');
-
-        // 1. Validation des données
-        $vehiculeId = $postData['id'] ?? null;
-        $marque = trim($postData['marque'] ?? '');
-        $modele = trim($postData['modele'] ?? '');
-        $plaque = trim($postData['plaque_immatriculation'] ?? '');
-        // ... (récupérer les autres champs) ...
-        $couleur = trim($postData['couleur'] ?? '');
-        $energie = trim($postData['energie'] ?? '');
-        $date_immat = trim($postData['date_premiere_immat'] ?? '');
-
-        if (empty($marque) || empty($modele) || empty($plaque)) {
-            echo json_encode(['success' => false, 'message' => 'Marque, modèle et plaque sont requis.']);
-            exit();
-        }
-
         try {
-            // 2. Instancier le modèle
-            $vehiculeModel = new VehiculeModel($pdo);
-            $success = false;
-
-            // 3. Appeler la bonne méthode du modèle
-            if ($vehiculeId) {
-                // Mise à jour
-                $success = $vehiculeModel->update(
-                    (int)$vehiculeId,
-                    $userId,
-                    $marque,
-                    $modele,
-                    $couleur,
-                    $plaque,
-                    $energie,
-                    $date_immat
-                );
-                $message = 'Véhicule mis à jour.';
-            } else {
-                // Création
-                $success = $vehiculeModel->create(
-                    $userId,
-                    $marque,
-                    $modele,
-                    $couleur,
-                    $plaque,
-                    $energie,
-                    $date_immat
-                );
-                $message = 'Véhicule ajouté.';
-            }
-
-            if (!$success) {
-                throw new \Exception('L\'opération sur le véhicule a échoué.');
-            }
-
-            echo json_encode(['success' => true, 'message' => $message]);
+            $client = Database::getMongoClient();
+            $client->listDatabases();
+            echo json_encode(['status' => 'success', 'message' => 'MongoDB est réveillé !']);
         } catch (\Exception $e) {
-            error_log("Erreur updateVehicle : " . $e->getMessage());
-            echo json_encode(['success' => false, 'message' => 'Erreur serveur lors de l\'opération.']);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit();
-    }
-
-    // -----------------------------------------------------------------
-    // LOGIQUE SANS SQL (Envoi d'email) - ON LA LAISSE TELLE QUELLE
-    // -----------------------------------------------------------------
-
-    /**
-     * Gère l'envoi du formulaire de contact.
-     * Cette fonction ne touche pas à la BDD SQL, elle est correcte.
-     */
-    public static function handleContactForm(array $postData)
-    {
-        $pseudo = trim($postData['pseudo'] ?? '');
-        $emailExpediteur = trim($postData['email'] ?? '');
-        $sujet = trim($postData['sujet'] ?? '');
-        $message = trim($postData['message'] ?? '');
-
-        if (empty($pseudo) || empty($emailExpediteur) || !filter_var($emailExpediteur, FILTER_VALIDATE_EMAIL) || empty($sujet) || empty($message)) {
-            $_SESSION['message'] = ['type' => 'danger', 'text' => 'Tous les champs sont requis et l\'email doit être valide.'];
-            header('Location: /contact');
-            exit;
-        }
-
-        $mail = new PHPMailer(true);
-
-        try {
-            // Configuration du serveur SMTP
-            $mail->isSMTP();
-            $mail->Host       = $_ENV['MAIL_HOST'];
-            $mail->SMTPAuth   = true;
-            $mail->Username   = $_ENV['MAIL_USERNAME'];
-            $mail->Password   = $_ENV['MAIL_PASSWORD'];
-            $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-            $mail->Port       = $_ENV['MAIL_PORT'];
-            $mail->CharSet    = 'UTF-8';
-
-            // Destinataires
-            $mail->setFrom($_ENV['MAIL_USERNAME'], 'Formulaire de Contact EcoRide');
-            $mail->addAddress('contact@ecoride.fr', 'Support EcoRide'); // Email de destination
-            $mail->addReplyTo($emailExpediteur, $pseudo);
-
-            // Contenu
-            $mail->isHTML(true);
-            $mail->Subject = 'Nouveau message de contact : ' . htmlspecialchars($sujet);
-            $mail->Body    = "Message de <b>" . htmlspecialchars($pseudo) . "</b> (" . htmlspecialchars($emailExpediteur) . ").<br><br><hr><br>" . nl2br(htmlspecialchars($message));
-            $mail->AltBody = "Message de " . htmlspecialchars($pseudo) . " (" . htmlspecialchars($emailExpediteur) . ").\n\n" . htmlspecialchars($message);
-
-            // $mail->send(); // Production
-            error_log("SIMULATION: Email de contact envoyé de " . $emailExpediteur); // Dev
-
-            $_SESSION['message'] = ['type' => 'success', 'text' => 'Votre message a bien été envoyé.'];
-        } catch (Exception $e) {
-            error_log("Erreur PHPMailer (contact) : {$mail->ErrorInfo}");
-            $_SESSION['message'] = ['type' => 'danger', 'text' => 'Le message n\'a pas pu être envoyé.'];
-        }
-
-        header('Location: /contact');
-        exit;
     }
 }

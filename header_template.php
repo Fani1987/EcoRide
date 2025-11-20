@@ -12,7 +12,7 @@
         crossorigin="anonymous"
         referrerpolicy="no-referrer" />
 
-    <link rel="stylesheet" href="/assets/main.min.css" />
+    <link rel="stylesheet" href="/assets/scss/main.min.css" />
 
     <title>EcoRide</title>
 </head>
@@ -26,7 +26,7 @@
                 <a class="navbar-brand" href="/">
                     <div class="d-flex align-items-center">
                         <img
-                            src="/assets/Images/EcoRide logo.jpeg"
+                            src="/assets/images/ecoride-logo.jpeg"
                             alt="Logo"
                             width="50"
                             height="50" />

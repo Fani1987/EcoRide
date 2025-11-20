@@ -1,0 +1,8 @@
+// 1. Bibliothèques externes et configuration
+@import url("/node_modules/bootstrap-icons/font/bootstrap-icons.css");
+@import "custom"; // Vos variables et Bootstrap
+
+// 2. Vos styles découpés (Partials)
+@import "layout";
+@import "components";
+@import "responsive";

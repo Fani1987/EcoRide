@@ -61,7 +61,7 @@
           <div class="order-1 order-md-2 col-md-6">
             <img
               class="imgIllustration"
-              src="/assets/Images/Environment.jpg"
+              src="/assets/images/environment.jpg"
               alt="Notre mission" />
           </div>
         </div>
@@ -93,7 +93,7 @@
       <div>
         <img
           class="imgIllustration"
-          src="/assets/Images/EcoRide logo.jpeg"
+          src="/assets/images/ecoride-logo.jpeg"
           alt="Rejoignez-nous" />
       </div>
       <div>

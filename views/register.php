@@ -1,6 +1,5 @@
 <main>
 
-
   <div class="container">
     <h1 class="bg-secondary text-center text-black m-6">Nouveau compte</h1>
   </div>
