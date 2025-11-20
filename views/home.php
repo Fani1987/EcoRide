@@ -93,7 +93,7 @@
       <div>
         <img
           class="imgIllustration"
-          src="/assets/Images/EcoRide logo.jpeg"
+          src="/assets/images/EcoRide logo.jpeg"
           alt="Rejoignez-nous" />
       </div>
       <div>
