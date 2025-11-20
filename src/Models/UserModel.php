@@ -1,32 +1,66 @@
 <?php
 
-namespace App\Models; // Namespace pour les Modèles
+namespace App\Models;
 
 use PDO;
-use PDOException; // Ajout de l'import pour la gestion d'erreur
+use PDOException;
 
+/**
+ * Class UserModel
+ *
+ * Ce Modèle gère l'entité `utilisateurs`, qui est centrale dans l'application.
+ * Elle contient les informations de connexion, les données personnelles et le SOLDE de crédits.
+ *
+ * Rôle :
+ * - Authentification (trouver par email).
+ * - Gestion financière (débiter/créditer).
+ * - Gestion des profils et des rôles.
+ * - Administration (création d'employés, suspension).
+ */
 class UserModel
 {
-    private $pdo; // Le modèle aura besoin de la connexion BDD
+    /**
+     * @var PDO Instance de connexion à la base de données (injectée).
+     */
+    private $pdo;
 
-    // On passe la connexion BDD au modèle lors de sa création
+    /**
+     * Constructeur.
+     * On utilise l'Injection de Dépendance pour récupérer la connexion active.
+     *
+     * @param PDO $pdo
+     */
     public function __construct(PDO $pdo)
     {
         $this->pdo = $pdo;
     }
 
     /**
-     * Trouve un utilisateur par son email.
+     * Trouve un utilisateur par son email pour l'authentification.
+     *
+     * @param string $email
+     * @return mixed Le tableau de l'utilisateur (avec le hash du mot de passe) ou false.
      */
     public function findUserByEmail(string $email)
     {
+        // On récupère les champs nécessaires à la connexion (mot de passe) et à la sécurité (actif, role).
+        // LIMIT 1 est une optimisation : on s'arrête dès qu'on a trouvé.
         $stmt = $this->pdo->prepare("SELECT id, mot_de_passe, role, actif FROM utilisateurs WHERE email = ? LIMIT 1");
         $stmt->execute([$email]);
         return $stmt->fetch();
     }
 
     /**
-     * Récupère le crédit d'un utilisateur (en verrouillant la ligne)
+     * Récupère le solde de crédits d'un utilisateur en VERROUILLANT la ligne.
+     *
+     * CONCEPT AVANCÉ : Pessimistic Locking (Verrouillage Pessimiste).
+     * L'instruction `FOR UPDATE` dit à la base de données :
+     * "Je lis ce solde pour le modifier. Personne d'autre ne peut y toucher tant que je n'ai pas fini."
+     *
+     * Cela empêche les "Race Conditions" (ex: dépenser les mêmes 10 crédits pour 2 trajets simultanés).
+     *
+     * @param int $userId
+     * @return float|false Le montant du crédit.
      */
     public function getCreditsForUpdate(int $userId)
     {
@@ -36,16 +70,25 @@ class UserModel
     }
 
     /**
-     * Débite des crédits à un utilisateur
+     * Débite des crédits à un utilisateur.
+     *
+     * @param int $userId
+     * @param float $amount Montant à retirer.
+     * @return bool
      */
     public function debitCredits(int $userId, float $amount): bool
     {
+        // On fait le calcul directement en SQL (credit = credit - ?) pour l'atomicité.
         $stmt = $this->pdo->prepare("UPDATE utilisateurs SET credit = credit - ? WHERE id = ?");
         return $stmt->execute([$amount, $userId]);
     }
 
     /**
-     * Crédite un utilisateur
+     * Crédite des crédits à un utilisateur (ex: après un trajet ou un achat).
+     *
+     * @param int $userId
+     * @param float $amount Montant à ajouter.
+     * @return bool
      */
     public function creditCredits(int $userId, float $amount): bool
     {
@@ -54,58 +97,63 @@ class UserModel
     }
 
     /**
-     * Crée une notification pour un utilisateur
-     */
-    public function createNotification(int $userId, string $message): bool
-    {
-        try {
-            $stmt = $this->pdo->prepare("INSERT INTO notifications (utilisateur_id, message) VALUES (?, ?)");
-            return $stmt->execute([$userId, $message]);
-        } catch (PDOException $e) {
-            error_log("Erreur création notification : " . $e->getMessage());
-            return false;
-        }
-    }
-
-    /**
-     * Vérifie si un email existe déjà dans la base.
+     * Vérifie si un email existe déjà (pour l'inscription).
+     *
+     * @param string $email
+     * @return bool Vrai si l'email est pris.
      */
     public function checkEmailExists(string $email): bool
     {
         $stmt = $this->pdo->prepare("SELECT COUNT(*) FROM utilisateurs WHERE email = ?");
         $stmt->execute([$email]);
+        // fetchColumn() retourne directement le résultat du COUNT (int).
         return $stmt->fetchColumn() > 0;
     }
 
     /**
-     * Crée un nouvel utilisateur (passager/chauffeur).
+     * Crée un nouvel utilisateur (Inscription).
+     *
+     * @param string $pseudo
+     * @param string $email
+     * @param string $hash Mot de passe haché (Bcrypt).
+     * @param float $credits Crédits de bienvenue.
+     * @param string $description Bio de l'utilisateur.
+     * @return int|false L'ID du nouvel utilisateur (pour créer son profil ensuite) ou false.
      */
-    public function createUser(string $pseudo, string $email, string $hash, float $credits, string $description): ?int
+    public function createUser(string $pseudo, string $email, string $hash, float $credits, string $description)
     {
         $stmt = $this->pdo->prepare(
-            "INSERT INTO utilisateurs (pseudo, email, mot_de_passe, role, credit, description)
-             VALUES (?, ?, ?, 'utilisateur', ?, ?)"
+            "INSERT INTO utilisateurs (pseudo, email, mot_de_passe, credit, description, role, actif) 
+             VALUES (?, ?, ?, ?, ?, 'utilisateur', 1)"
         );
+
         if ($stmt->execute([$pseudo, $email, $hash, $credits, $description])) {
-            return (int)$this->pdo->lastInsertId();
+            // On retourne l'ID auto-incrémenté généré par MySQL
+            return $this->pdo->lastInsertId();
         }
-        return null;
+        return false;
     }
 
     /**
-     * Crée un compte employé (rôle 'employe').
+     * Crée un compte employé (Back-office).
+     * Le rôle est forcé à 'employe'.
      */
-    public function createEmployee(string $pseudo, string $email, string $hash): bool
+    public function createEmployee(string $nom, string $email, string $hash): bool
     {
         $stmt = $this->pdo->prepare(
-            "INSERT INTO utilisateurs (pseudo, email, mot_de_passe, role, actif, credit)
-             VALUES (?, ?, ?, 'employe', 1, 0)"
+            "INSERT INTO utilisateurs (pseudo, email, mot_de_passe, role, actif) 
+             VALUES (?, ?, ?, 'employe', 1)"
         );
-        return $stmt->execute([$pseudo, $email, $hash]);
+        return $stmt->execute([$nom, $email, $hash]);
     }
 
     /**
-     * Met à jour le statut 'actif' d'un utilisateur (pour suspendre/réactiver).
+     * Change le statut d'activation d'un compte (Suspension / Réactivation).
+     *
+     * @param string $email L'email de la cible.
+     * @param string $role Le rôle (sécurité pour ne pas suspendre un admin par erreur).
+     * @param int $status 0 pour suspendre, 1 pour activer.
+     * @return int Le nombre de lignes modifiées (permet de savoir si le compte existait).
      */
     public function updateUserActiveStatus(string $email, string $role, int $status): int
     {
@@ -116,6 +164,13 @@ class UserModel
 
     /**
      * Récupère les infos complètes du profil (utilisateur + rôles).
+     *
+     * Utilise une JOINTURE GAUCHE (LEFT JOIN) avec la table `profils_utilisateur`.
+     * Cela permet de récupérer les indicateurs `est_chauffeur` et `est_passager`
+     * en même temps que les infos de base.
+     *
+     * @param int $userId
+     * @return mixed
      */
     public function findProfilById(int $userId)
     {
@@ -131,6 +186,7 @@ class UserModel
 
     /**
      * Récupère les infos de base d'un utilisateur (pour la page d'édition).
+     * Version simple sans jointure.
      */
     public function findById(int $userId)
     {
@@ -145,9 +201,8 @@ class UserModel
     public function updateProfile(int $userId, string $pseudo, string $email, string $description): bool
     {
         $stmt = $this->pdo->prepare(
-            "UPDATE utilisateurs SET pseudo = ?, email = ?, description = ?
-             WHERE id = ?"
+            "UPDATE utilisateurs SET pseudo = ?, email = ?, description = ? WHERE id = ?"
         );
         return $stmt->execute([$pseudo, $email, $description, $userId]);
     }
-} // <-- Fin de la classe UserModel
+}
